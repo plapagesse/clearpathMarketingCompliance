@@ -32,13 +32,60 @@ conceptual rule for display/dedup purposes.
 Each product file ends with a `citation_index`: the unique citation URLs used in that
 file (validated against actual usage).
 
+## What "deterministic" means here (normative for the Stage-4 checker)
+
+"Deterministic" is a claim about the **decision**, not about detection completeness.
+Every deterministic rule is a **pure function**: given its detected inputs (matched
+text, extracted Claim/Disclosure objects, offer-cell fields, submission metadata), the
+verdict is fully determined — no judgment anywhere in the decision. Detection
+completeness for concept-bound rules is a separate, *measured* property (the fixtures
+eval), never an assumed one.
+
+Each deterministic rule therefore declares two audit fields:
+
+- **`binding`** — what the law binds on:
+  - `token`: the law mandates/prohibits **literal words or layout** — APR labeling
+    (1026.24(c)), "intro" adjacency (1026.16(g)), "if paid in full" (1026.16(h)), the
+    prescreen notice heading, NMLS presence, the literal word "fixed", "counselor".
+    For these, a normalized string/layout check **is** the legal test.
+  - `concept`: the law binds on **meaning however phrased** — trigger terms as
+    concepts, guaranteed-approval paraphrases, fee misrepresentation, urgency,
+    soft-pull claims. A phrase list can never be the legal test for these.
+- **`decision_inputs`** — where the decision runs:
+  - `text_plane` (token-bound only): the check runs on normalized raw text; its
+    pattern fields are the test itself.
+  - `claim_plane` (concept-bound): the decision runs on typed Claim/Disclosure
+    objects from the extractor (plus offer-cell/submission fields). Any raw-text
+    patterns on such rules are named **`safety_net_patterns`** — secondary detectors
+    that catch what extraction missed; they are NOT the test.
+
+`concept` + `text_plane` is an invalid combination (validation fails): a concept rule
+whose only decision input is raw text would be smuggling a completeness claim.
+
+### Normalization spec (all text_plane checks)
+
+One pipeline, applied identically everywhere, in order:
+
+1. Unicode **NFKC** normalization;
+2. HTML-entity decode (`&amp;` → `&`, numeric entities included);
+3. curly/straight **quote and apostrophe normalization** (`’` → `'`, `“”` → `"`);
+4. **lowercase** (checks are case-insensitive; patterns written in caps are style, not case-sensitivity);
+5. **whitespace collapse** (all runs of whitespace, incl. NBSP, → one space);
+6. matching is **word-boundary aware**; where a pattern intends plural tolerance it
+   says so explicitly with `(s)?` — pluralization is never implied.
+
+Principle: *deterministic = specified reproducible normalization + pure decision
+function*. It is **not** byte-equality, and it is **not** a completeness claim for
+concept detection.
+
 ## Deterministic primitives — the Stage-4 checker implementation spec
 
 Every deterministic rule's `parameters` carries exactly:
 
 1. **`check_type`** — one of the CLOSED vocabulary below (undeclared/malformed fails validation);
 2. **`check_description`** — one plain-English sentence saying what the check verifies (required, for non-engineers);
-3. **minimal readable parameters** — small inline values, or **named data references**: any list/dict-valued field may be the string `"@<file>.<key>"`, resolved against `data/lexicons.json`, `data/patterns.json`, or `data/state_apr_caps.json`. A dangling reference fails validation. Bulky data (phrase lists, regex sets, the cap table) lives ONLY in `data/`.
+3. **`binding`** and **`decision_inputs`** — the audit fields defined above;
+4. **minimal readable parameters** — small inline values, or **named data references**: any list/dict-valued field may be the string `"@<file>.<key>"`, resolved against `data/lexicons.json`, `data/patterns.json`, or `data/state_apr_caps.json`. A dangling reference fails validation. Bulky data (phrase lists, regex sets, the cap table) lives ONLY in `data/`. On claim_plane rules, phrase/trigger pattern fields are renamed `safety_net_patterns`.
 
 `note` is the only other key permitted — human context, never executed.
 
@@ -55,6 +102,7 @@ Every deterministic rule's `parameters` carries exactly:
 
 Additional conventions:
 
+- **Pattern-key placement by plane:** `phrase_prohibited`/`phrase_conditional` carry `phrases` and `trigger_requires_disclosures` carries `trigger_patterns` ONLY on text_plane rules; on claim_plane rules the same data appears as `safety_net_patterns` (secondary detectors). Token-bound rules must carry at least one resolvable pattern-bearing key; text_plane `element_required` rules must carry `detection_ref`.
 - `applies_when` variants: `{"offer_field": F, "equals": V}` (gate on the referenced offer cell), `{"surface_in": [...]}` (gate on `Submission.surface`), `{"any_anchor_matched": true}` (inside `composite_all`: gate on a sibling proximity check's anchors having matched).
 - **Verification-input condition fields:** some `condition_field` values are not `OfferCell` columns (`soft_pull_verified`, `government_program_verified`, `effective_end_supports_urgency`). The checker resolves them from integration config / derives them from the matrix as described in each rule's `note`; an unresolvable condition emits a needs-verification finding rather than passing silently.
 - Findings inherit the rule's `severity` and `citation_url`. Overlapping hits (e.g. `XP-UDAAP-001-mortgage_prequal` vs `MTG-REGN-001`) dedupe by (claim, phrase), keeping the highest-severity rule.

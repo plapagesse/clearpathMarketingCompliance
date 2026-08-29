@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Validate the rulebook: pydantic conformance, per-primitive parameter schemas,
-data_ref resolution, llm_judged enrichment, citation indexes, manifest counts,
-and claim_types_legal_map alignment with the ClaimType enum.
+binding/decision-plane audit fields, data_ref resolution, llm_judged enrichment,
+citation indexes, manifest counts, and claim_types_legal_map/enum alignment.
 
 Run from the repo root (or anywhere):  python rulebook/validate_rulebook.py
 Non-zero exit on any failure. Rules reference shared data via '@<file>.<key>'
 strings resolved against rulebook/data/{lexicons,patterns,state_apr_caps}.json;
 a dangling reference is a validation failure.
+
+Determinism audit (v2026.08.2): every deterministic rule declares
+  binding: token | concept        (does the LAW bind on literal words/layout, or meaning?)
+  decision_inputs: text_plane | claim_plane
+Constraints: concept+text_plane is invalid; claim_plane phrase/trigger rules carry
+safety_net_patterns (secondary detectors) instead of primary pattern keys;
+token-bound rules must have at least one resolvable pattern-bearing key.
 """
 
 from __future__ import annotations
@@ -24,6 +31,9 @@ from backend.contracts import CheckKind, ClaimType, DisclosureType, RulebookEntr
 
 DISCLOSURE_VALUES = {d.value for d in DisclosureType}
 DATA_FILES = ("lexicons", "patterns", "state_apr_caps")
+BINDINGS = {"token", "concept"}
+PLANES = {"text_plane", "claim_plane"}
+PATTERN_KEYS = ("phrases", "trigger_patterns", "anchor_patterns", "companion_patterns", "detection_ref", "safety_net_patterns")
 
 
 def load_data() -> dict[str, dict]:
@@ -62,28 +72,29 @@ def _is_str_list(v):  # noqa: ANN001
 MATCH_MODES = {"case_insensitive_substring", "case_insensitive_regex"}
 COMPARATORS = {"within_range", "equals", "exists_in", "disjoint_from", "not_conflated"}
 
-# check_type -> {required: {field: predicate}, optional: {field: predicate}}
-# Predicates run on the ref-RESOLVED value; any list/dict field may be given
-# inline or as an '@file.key' reference.
-PRIMITIVES: dict[str, dict[str, dict]] = {
+# check_type -> {required, optional, pattern_key}
+# pattern_key: the primary detector field; on claim_plane rules it is REPLACED by
+# safety_net_patterns (secondary detectors — the decision runs on claim objects).
+PRIMITIVES: dict[str, dict] = {
     "phrase_prohibited": {
-        "required": {"phrases": _is_str_list, "match": lambda v: v in MATCH_MODES},
+        "required": {"match": lambda v: v in MATCH_MODES},
         "optional": {},
+        "pattern_key": "phrases",
     },
     "phrase_conditional": {
         "required": {
-            "phrases": _is_str_list,
             "condition_field": lambda v: isinstance(v, str),
             "violates_when": lambda v: isinstance(v, (bool, str)),
         },
         "optional": {"required_qualifier": lambda v: isinstance(v, str)},
+        "pattern_key": "phrases",
     },
     "trigger_requires_disclosures": {
         "required": {
-            "trigger_patterns": _is_str_list,
             "required_disclosure_types": lambda v: _is_str_list(v) and set(v) <= DISCLOSURE_VALUES,
         },
         "optional": {},
+        "pattern_key": "trigger_patterns",
     },
     "element_required": {
         "required": {"element": lambda v: isinstance(v, str)},
@@ -91,6 +102,7 @@ PRIMITIVES: dict[str, dict[str, dict]] = {
             "applies_when": lambda v: isinstance(v, dict),
             "detection_ref": _is_str_list,  # validated post-resolution
         },
+        "pattern_key": None,
     },
     "proximity_required": {
         "required": {
@@ -99,6 +111,7 @@ PRIMITIVES: dict[str, dict[str, dict]] = {
             "requirement": lambda v: isinstance(v, str),
         },
         "optional": {},
+        "pattern_key": None,
     },
     "ground_truth_consistency": {
         "required": {
@@ -107,6 +120,7 @@ PRIMITIVES: dict[str, dict[str, dict]] = {
             "comparator": lambda v: v in COMPARATORS,
         },
         "optional": {},
+        "pattern_key": None,
     },
     "numeric_cap_by_state": {
         "required": {
@@ -114,11 +128,13 @@ PRIMITIVES: dict[str, dict[str, dict]] = {
             "compare": lambda v: isinstance(v, str),
         },
         "optional": {},
+        "pattern_key": None,
     },
     # Structural primitive (the one documented addition): ALL sub-checks must pass.
     "composite_all": {
         "required": {"checks": lambda v: isinstance(v, list) and v},
         "optional": {},
+        "pattern_key": None,
     },
 }
 
@@ -131,18 +147,70 @@ LLM_REQUIRED = {
 LLM_OPTIONAL = {"detect_patterns", "required_disclosure_types", "note"}
 
 
-def validate_primitive(params: dict, rid: str, errors: list[str], depth: int = 0) -> str | None:
+def has_resolvable_patterns(params: dict, rid: str, errors: list[str]) -> bool:
+    """True if this primitive block (or any composite sub-check) carries at least
+    one pattern-bearing key whose value resolves to a non-empty string list."""
+    found = False
+    for key in PATTERN_KEYS:
+        if key in params:
+            resolved = resolve_ref(params[key], rid, errors)
+            if resolved is not None and _is_str_list(resolved):
+                found = True
+    for sub in params.get("checks", []) if params.get("check_type") == "composite_all" else []:
+        if isinstance(sub, dict) and has_resolvable_patterns(sub, rid, errors):
+            found = True
+    return found
+
+
+def validate_primitive(params: dict, rid: str, plane: str | None, errors: list[str], depth: int = 0) -> str | None:
     """Validate one primitive block (top-level rule or composite sub-check)."""
     ct = params.get("check_type")
     if ct not in PRIMITIVES:
         errors.append(f"{rid}: unknown or missing check_type {ct!r}")
         return None
+    spec = PRIMITIVES[ct]
+
+    binding = params.get("binding")
     if depth == 0:
         desc = params.get("check_description")
         if not (isinstance(desc, str) and desc.strip()):
             errors.append(f"{rid}: missing check_description")
-    spec = PRIMITIVES[ct]
+        if binding not in BINDINGS:
+            errors.append(f"{rid}: missing or invalid binding {binding!r} (token|concept)")
+        if plane not in PLANES:
+            errors.append(f"{rid}: missing or invalid decision_inputs {plane!r} (text_plane|claim_plane)")
+        if binding == "concept" and plane == "text_plane":
+            errors.append(f"{rid}: invalid combination binding=concept with decision_inputs=text_plane")
+        if binding == "token" and not has_resolvable_patterns(params, rid, errors):
+            errors.append(f"{rid}: token-bound rule has no resolvable pattern-bearing key")
+
     allowed = {"check_type", "check_description", "note", *spec["required"], *spec["optional"]}
+    if depth == 0:
+        allowed |= {"binding", "decision_inputs"}
+    pk = spec["pattern_key"]
+    if pk:
+        allowed |= {pk, "safety_net_patterns"}
+        primary = pk in params
+        safety = "safety_net_patterns" in params
+        if plane == "claim_plane":
+            if primary:
+                errors.append(f"{rid}: [{ct}] claim_plane rule must use safety_net_patterns, not {pk!r}")
+            if not safety:
+                errors.append(f"{rid}: [{ct}] claim_plane rule missing safety_net_patterns")
+        else:  # text_plane (or sub-check inheriting it)
+            if safety:
+                errors.append(f"{rid}: [{ct}] text_plane rule must use {pk!r}, not safety_net_patterns")
+            if not primary:
+                errors.append(f"{rid}: [{ct}] missing required key {pk!r}")
+        for key in (pk, "safety_net_patterns"):
+            if key in params:
+                resolved = resolve_ref(params[key], rid, errors)
+                if resolved is not None and not _is_str_list(resolved):
+                    errors.append(f"{rid}: [{ct}] malformed value for {key!r}")
+    if ct == "element_required" and depth == 0:
+        if plane == "text_plane" and "detection_ref" not in params:
+            errors.append(f"{rid}: [element_required] text_plane rule requires detection_ref")
+
     for key in params:
         if key not in allowed:
             errors.append(f"{rid}: [{ct}] unexpected parameter key {key!r}")
@@ -167,7 +235,7 @@ def validate_primitive(params: dict, rid: str, errors: list[str], depth: int = 0
             if not isinstance(sub, dict):
                 errors.append(f"{rid}: composite_all checks[{i}] is not an object")
                 continue
-            validate_primitive(sub, f"{rid}.checks[{i}]", errors, depth + 1)
+            validate_primitive(sub, f"{rid}.checks[{i}]", plane, errors, depth + 1)
     return ct
 
 
@@ -179,7 +247,6 @@ def main() -> int:
         if DATA[stem] is None:
             errors.append(f"missing data file: rulebook/data/{stem}.json")
 
-    # claim_types_legal_map must align 1:1 with the ClaimType enum
     map_path = RULEBOOK_DIR / "claim_types_legal_map.json"
     if map_path.exists():
         mapped = set(json.loads(map_path.read_text()).get("claim_types", {}))
@@ -195,6 +262,7 @@ def main() -> int:
     by_product: Counter[str] = Counter()
     by_kind: Counter[str] = Counter()
     by_check_type: Counter[str] = Counter()
+    by_binding: Counter[str] = Counter()
     seen_ids: set[str] = set()
     total = 0
 
@@ -223,9 +291,13 @@ def main() -> int:
             used_citations.add(entry.citation_url)
 
             if entry.check_kind == CheckKind.DETERMINISTIC:
-                ct = validate_primitive(entry.parameters, rid, errors)
+                plane = entry.parameters.get("decision_inputs")
+                ct = validate_primitive(entry.parameters, rid, plane, errors)
                 if ct:
                     by_check_type[ct] += 1
+                b = entry.parameters.get("binding")
+                if b in BINDINGS:
+                    by_binding[b] += 1
             else:
                 allowed = set(LLM_REQUIRED) | LLM_OPTIONAL
                 for key in entry.parameters:
@@ -254,6 +326,7 @@ def main() -> int:
     print(f"by product: {dict(by_product)}")
     print(f"by check_kind: {dict(by_kind)}")
     print(f"by check_type (deterministic primitives): {dict(by_check_type)}")
+    print(f"by binding (deterministic): {dict(by_binding)}")
 
     declared = manifest.get("counts", {})
     if declared.get("total") != total:
@@ -264,6 +337,8 @@ def main() -> int:
         errors.append(f"manifest by_check_kind {declared.get('by_check_kind')} != actual {dict(by_kind)}")
     if declared.get("by_check_type") != dict(by_check_type):
         errors.append(f"manifest by_check_type {declared.get('by_check_type')} != actual {dict(by_check_type)}")
+    if declared.get("by_binding") != dict(by_binding):
+        errors.append(f"manifest by_binding {declared.get('by_binding')} != actual {dict(by_binding)}")
 
     if errors:
         print("\nVALIDATION FAILED:")

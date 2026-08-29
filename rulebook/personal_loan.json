@@ -5,14 +5,20 @@
     {
       "rule_id": "PL-TRIG-001",
       "product": "personal_loan",
-      "claim_types": ["triggering_term"],
+      "claim_types": [
+        "triggering_term"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "When the ad states a payment amount, number of payments, repayment period, downpayment, or finance charge, the full Reg Z companion disclosures must be present.",
-        "trigger_patterns": "@patterns.triggering_terms_closed_end",
-        "required_disclosure_types": ["trigger_disclosure"]
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "trigger_disclosure"
+        ],
+        "safety_net_patterns": "@patterns.triggering_terms_closed_end"
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
       "explanation": "Reg Z 12 CFR 1026.24(d): stating a payment amount, number of payments, repayment period, downpayment, or finance-charge amount is a 'triggering term'. Any one present requires the ad to also disclose the downpayment, the full repayment terms, and the APR (labeled as such) plus whether it may increase."
@@ -20,12 +26,16 @@
     {
       "rule_id": "PL-APR-001",
       "product": "personal_loan",
-      "claim_types": ["rate_or_apr"],
+      "claim_types": [
+        "rate_or_apr"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "proximity_required",
         "check_description": "Every advertised rate must be labeled as an APR, and no simple rate may be displayed more prominently than the APR.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
         "anchor_patterns": "@patterns.rate_percentage",
         "companion_patterns": "@patterns.apr_label",
         "requirement": "Every advertised rate must carry the label 'APR' or 'annual percentage rate'; a simple/periodic rate may appear only alongside the APR and not more conspicuously."
@@ -36,15 +46,21 @@
     {
       "rule_id": "PL-APR-002",
       "product": "personal_loan",
-      "claim_types": ["rate_or_apr"],
+      "claim_types": [
+        "rate_or_apr"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "A 'rates as low as X%' floor claim must have a creditworthiness/conditions qualifier in the same view.",
-        "trigger_patterns": "@patterns.aslowas_floor",
-        "required_disclosure_types": ["apr_qualifier"],
-        "note": "Floor availability itself is reconciled by PL-TRUTH-001."
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "apr_qualifier"
+        ],
+        "note": "Floor availability itself is reconciled by PL-TRUTH-001.",
+        "safety_net_patterns": "@patterns.aslowas_floor"
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/interp-24/",
       "explanation": "'As low as X%' floor advertising requires (a) the floor to be actually available to some meaningful share of applicants and (b) a creditworthiness/conditions qualifier near the number. Missing qualifier is a deterministic fail; floor availability is checked against the offer matrix (see PL-TRUTH-001)."
@@ -52,18 +68,49 @@
     {
       "rule_id": "PL-TRUTH-001",
       "product": "personal_loan",
-      "claim_types": ["rate_or_apr", "triggering_term", "fee_or_cost"],
+      "claim_types": [
+        "rate_or_apr",
+        "triggering_term",
+        "fee_or_cost"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "composite_all",
         "check_description": "Every advertised rate, amount, and term must exist in the referenced offer-matrix cells at their current, unexpired version.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "checks": [
-          {"check_type": "ground_truth_consistency", "claim_field": "rate_value", "matrix_field": "apr_min..apr_max", "comparator": "within_range"},
-          {"check_type": "ground_truth_consistency", "claim_field": "rate_floor", "matrix_field": "apr_min", "comparator": "equals"},
-          {"check_type": "ground_truth_consistency", "claim_field": "amount_value", "matrix_field": "amount_min..amount_max", "comparator": "within_range"},
-          {"check_type": "ground_truth_consistency", "claim_field": "term_months", "matrix_field": "term_months", "comparator": "exists_in"},
-          {"check_type": "ground_truth_consistency", "claim_field": "review_date", "matrix_field": "effective_start..effective_end", "comparator": "within_range"}
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_value",
+            "matrix_field": "apr_min..apr_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_floor",
+            "matrix_field": "apr_min",
+            "comparator": "equals"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "amount_value",
+            "matrix_field": "amount_min..amount_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "term_months",
+            "matrix_field": "term_months",
+            "comparator": "exists_in"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "review_date",
+            "matrix_field": "effective_start..effective_end",
+            "comparator": "within_range"
+          }
         ]
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
@@ -72,12 +119,16 @@
     {
       "rule_id": "PL-STATE-CAP-001",
       "product": "personal_loan",
-      "claim_types": ["rate_or_apr"],
+      "claim_types": [
+        "rate_or_apr"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "numeric_cap_by_state",
         "check_description": "The top of the advertised APR range must not exceed the rate cap of any state the placement targets.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "caps_table": "@state_apr_caps.us_consumer_loan_caps",
         "compare": "advertised_apr_max_vs_caps_of_states_targeted"
       },
@@ -87,12 +138,16 @@
     {
       "rule_id": "PL-STATE-EXCL-001",
       "product": "personal_loan",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "ground_truth_consistency",
         "check_description": "The placement's targeted states must not include any state the referenced offers exclude.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "claim_field": "states_targeted",
         "matrix_field": "states_excluded",
         "comparator": "disjoint_from"
@@ -103,16 +158,20 @@
     {
       "rule_id": "PL-FEE-001",
       "product": "personal_loan",
-      "claim_types": ["fee_or_cost"],
+      "claim_types": [
+        "fee_or_cost"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "A 'no fees' style claim is a violation when the referenced offer deducts an origination fee from loan proceeds, unless the fee is disclosed right next to the claim.",
-        "phrases": "@lexicons.no_fee_claims",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "fee_deducted_from_proceeds",
         "violates_when": true,
-        "required_qualifier": "origination fee amount/percentage disclosed in immediate proximity"
+        "required_qualifier": "origination fee amount/percentage disclosed in immediate proximity",
+        "safety_net_patterns": "@lexicons.no_fee_claims"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "'No (hidden) fees' is deceptive when an origination fee is deducted from loan proceeds (the FTC's LendingClub case theory). Conditional: the phrase is only a violation when the referenced offer cell carries fee_deducted_from_proceeds=true without a proximate fee disclosure."
@@ -120,16 +179,20 @@
     {
       "rule_id": "PL-BADGE-001",
       "product": "personal_loan",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "'Pre-approved' may appear only when the referenced offer is a true FCRA firm offer of credit.",
-        "phrases": "@lexicons.preapproved_terms",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "is_firm_offer",
         "violates_when": false,
-        "note": "Checker should also reconcile submission.badge_text against offer.badge_designation_allowed."
+        "note": "Checker should also reconcile submission.badge_text against offer.badge_designation_allowed.",
+        "safety_net_patterns": "@lexicons.preapproved_terms"
       },
       "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
       "explanation": "'Pre-approved' may only be used when the offer is a true FCRA firm offer (offer matrix is_firm_offer=true) or completed underwriting stands behind it. FTC v. Credit Karma ($3M): roughly a third of 'pre-approved' consumers were denied. Otherwise the badge must be 'prequalified' with qualifiers."
@@ -137,7 +200,12 @@
     {
       "rule_id": "PL-JUDGE-001",
       "product": "personal_loan",
-      "claim_types": ["rate_or_apr", "fee_or_cost", "approval_or_prequalification", "general_udaap_representation"],
+      "claim_types": [
+        "rate_or_apr",
+        "fee_or_cost",
+        "approval_or_prequalification",
+        "general_udaap_representation"
+      ],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {
@@ -156,7 +224,9 @@
     {
       "rule_id": "PL-JUDGE-002",
       "product": "personal_loan",
-      "claim_types": ["triggering_term"],
+      "claim_types": [
+        "triggering_term"
+      ],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {

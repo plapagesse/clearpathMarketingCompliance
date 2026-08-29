@@ -5,14 +5,19 @@
     {
       "rule_id": "XP-UDAAP-001-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["approval_or_prequalification", "general_udaap_representation"],
+      "claim_types": [
+        "approval_or_prequalification",
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "Approval-certainty phrases like 'guaranteed approval' or 'no credit check' are banned outright wherever any underwriting exists.",
-        "phrases": "@lexicons.udaap_prohibited",
-        "match": "case_insensitive_substring"
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "match": "case_insensitive_substring",
+        "safety_net_patterns": "@lexicons.udaap_prohibited"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
@@ -20,14 +25,19 @@
     {
       "rule_id": "XP-UDAAP-001-credit_card",
       "product": "credit_card",
-      "claim_types": ["approval_or_prequalification", "general_udaap_representation"],
+      "claim_types": [
+        "approval_or_prequalification",
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "Approval-certainty phrases like 'guaranteed approval' or 'no credit check' are banned outright wherever any underwriting exists.",
-        "phrases": "@lexicons.udaap_prohibited",
-        "match": "case_insensitive_substring"
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "match": "case_insensitive_substring",
+        "safety_net_patterns": "@lexicons.udaap_prohibited"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
@@ -35,15 +45,20 @@
     {
       "rule_id": "XP-UDAAP-001-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["approval_or_prequalification", "general_udaap_representation"],
+      "claim_types": [
+        "approval_or_prequalification",
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "Approval-certainty phrases like 'guaranteed approval' or 'no credit check' are banned outright wherever any underwriting exists.",
-        "phrases": "@lexicons.udaap_prohibited",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "match": "case_insensitive_substring",
-        "note": "Overlaps MTG-REGN-001 for approval phrases; checker dedupes findings by (claim, phrase) keeping the highest-severity rule."
+        "note": "Overlaps MTG-REGN-001 for approval phrases; checker dedupes findings by (claim, phrase) keeping the highest-severity rule.",
+        "safety_net_patterns": "@lexicons.udaap_prohibited"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
@@ -51,14 +66,20 @@
     {
       "rule_id": "XP-PREQ-002-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "Whenever the creative says 'prequalified', an approval-not-guaranteed qualifier must be present.",
-        "trigger_patterns": "@patterns.prequalified_terms",
-        "required_disclosure_types": ["not_guaranteed"]
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "not_guaranteed"
+        ],
+        "safety_net_patterns": "@patterns.prequalified_terms"
       },
       "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
       "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier so the net impression matches what a prequalification actually is."
@@ -66,14 +87,20 @@
     {
       "rule_id": "XP-PREQ-002-credit_card",
       "product": "credit_card",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "Whenever the creative says 'prequalified', an approval-not-guaranteed qualifier must be present.",
-        "trigger_patterns": "@patterns.prequalified_terms",
-        "required_disclosure_types": ["not_guaranteed"]
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "not_guaranteed"
+        ],
+        "safety_net_patterns": "@patterns.prequalified_terms"
       },
       "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
       "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier so the net impression matches what a prequalification actually is."
@@ -81,15 +108,21 @@
     {
       "rule_id": "XP-PREQ-002-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "Whenever mortgage creative says 'prequalified', an approval-not-guaranteed qualifier must be present.",
-        "trigger_patterns": "@patterns.prequalified_terms",
-        "required_disclosure_types": ["not_guaranteed"],
-        "note": "For mortgage, some states additionally require an explicit 'THIS IS NOT A LOAN APPROVAL' legend (e.g. Virginia, >=14pt bold)."
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "not_guaranteed"
+        ],
+        "note": "For mortgage, some states additionally require an explicit 'THIS IS NOT A LOAN APPROVAL' legend (e.g. Virginia, >=14pt bold).",
+        "safety_net_patterns": "@patterns.prequalified_terms"
       },
       "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
       "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier (for mortgage, some states additionally require an explicit 'this is not a loan approval' legend)."
@@ -97,7 +130,9 @@
     {
       "rule_id": "XP-COMP-003-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
@@ -115,7 +150,9 @@
     {
       "rule_id": "XP-COMP-003-credit_card",
       "product": "credit_card",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
@@ -133,7 +170,9 @@
     {
       "rule_id": "XP-COMP-003-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
@@ -151,16 +190,20 @@
     {
       "rule_id": "XP-URG-004-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "Urgency devices ('act now', 'expires today') are flagged unless the referenced offer really expires when the ad implies.",
-        "phrases": "@lexicons.urgency_devices",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "effective_end_supports_urgency",
         "violates_when": false,
-        "note": "effective_end_supports_urgency is derived by the checker from the offer cell's effective_end."
+        "note": "effective_end_supports_urgency is derived by the checker from the offer cell's effective_end.",
+        "safety_net_patterns": "@lexicons.urgency_devices"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "Fake-urgency devices are deceptive dark patterns unless the offer genuinely expires when the ad says it does. Flag and reconcile against the offer matrix effective window."
@@ -168,16 +211,20 @@
     {
       "rule_id": "XP-URG-004-credit_card",
       "product": "credit_card",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "Urgency devices ('act now', 'expires today') are flagged unless the referenced offer really expires when the ad implies.",
-        "phrases": "@lexicons.urgency_devices",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "effective_end_supports_urgency",
         "violates_when": false,
-        "note": "effective_end_supports_urgency is derived by the checker from the offer cell's effective_end."
+        "note": "effective_end_supports_urgency is derived by the checker from the offer cell's effective_end.",
+        "safety_net_patterns": "@lexicons.urgency_devices"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "Fake-urgency devices are deceptive dark patterns unless the offer genuinely expires when the ad says it does. Flag and reconcile against the offer matrix effective window."
@@ -185,16 +232,20 @@
     {
       "rule_id": "XP-URG-004-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "Urgency devices on mortgage creative are flagged unless tied to a real pricing window; official/final-notice framing also implicates Reg N.",
-        "phrases": "@lexicons.urgency_devices",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "effective_end_supports_urgency",
         "violates_when": false,
-        "note": "Derived condition as in the sibling rules; 'final notice'/'official notice' framing on mortgage creative also implicates Reg N fake-source/affiliation prohibitions (see MTG-GOV-001)."
+        "note": "Derived condition as in the sibling rules; 'final notice'/'official notice' framing on mortgage creative also implicates Reg N fake-source/affiliation prohibitions (see MTG-GOV-001).",
+        "safety_net_patterns": "@lexicons.urgency_devices"
       },
       "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
       "explanation": "Fake-urgency devices are deceptive unless tied to a real expiration; on mortgage creative, urgency dressed as an official/final notice also violates Reg N's misrepresentation-of-source prohibitions."
@@ -202,12 +253,19 @@
     {
       "rule_id": "XP-ODDS-005-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
         "judge_focus": "Approval-odds claims ('90% approval odds', 'outstanding approval odds'): does the integration type support them (lender-decisioned prequal vs partner odds model)? Is there a substantiation basis mapping the number/label to realized approval rates for this channel? Flag any odds language lacking a documented basis.",
-        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"],
+        "detect_patterns": [
+          "\\b\\d{1,3}\\s?%\\s?(approval )?odds",
+          "approval odds",
+          "excellent odds",
+          "outstanding odds"
+        ],
         "violation_examples": [
           "90%+ approval odds for members like you (partner similarity model; realized approval rate for the channel is 61%)",
           "Outstanding approval odds — you're practically in!"
@@ -222,12 +280,19 @@
     {
       "rule_id": "XP-ODDS-005-credit_card",
       "product": "credit_card",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
         "judge_focus": "Approval-odds claims ('90% approval odds', 'excellent approval odds'): does the integration type support them? Is there a substantiation basis mapping the number/label to realized approval rates for this channel? Flag any odds language lacking a documented basis.",
-        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"],
+        "detect_patterns": [
+          "\\b\\d{1,3}\\s?%\\s?(approval )?odds",
+          "approval odds",
+          "excellent odds",
+          "outstanding odds"
+        ],
         "violation_examples": [
           "Excellent approval odds on the ClearPath Platinum (no mapping from the label to realized channel approval rates)",
           "95% of applicants like you get this card! (unsupported)"
@@ -242,12 +307,19 @@
     {
       "rule_id": "XP-ODDS-005-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "llm_judged",
       "severity": "critical",
       "parameters": {
         "judge_focus": "Any approval-odds framing on mortgage prequal creative: Reg N 1014.3(q) bans misrepresenting approval likelihood outright — treat numeric odds claims on mortgage as presumptively non-compliant, not merely unsubstantiated.",
-        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"],
+        "detect_patterns": [
+          "\\b\\d{1,3}\\s?%\\s?(approval )?odds",
+          "approval odds",
+          "excellent odds",
+          "outstanding odds"
+        ],
         "violation_examples": [
           "92% approval odds on your refinance — see your rate now",
           "Outstanding odds of mortgage approval for homeowners in your area"
@@ -261,7 +333,9 @@
     {
       "rule_id": "XP-TEST-006-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["endorsement_or_testimonial"],
+      "claim_types": [
+        "endorsement_or_testimonial"
+      ],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {
@@ -279,7 +353,9 @@
     {
       "rule_id": "XP-TEST-006-credit_card",
       "product": "credit_card",
-      "claim_types": ["endorsement_or_testimonial"],
+      "claim_types": [
+        "endorsement_or_testimonial"
+      ],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {
@@ -297,7 +373,9 @@
     {
       "rule_id": "XP-TEST-006-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["endorsement_or_testimonial"],
+      "claim_types": [
+        "endorsement_or_testimonial"
+      ],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {
@@ -315,16 +393,20 @@
     {
       "rule_id": "XP-SOFT-007-personal_loan",
       "product": "personal_loan",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "A 'won't affect your credit score' claim is flagged until the flow is verified as soft-pull end-to-end before final application.",
-        "phrases": "@lexicons.soft_pull_claims",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "soft_pull_verified",
         "violates_when": false,
-        "note": "soft_pull_verified is a verification input, not an OfferCell column; the checker resolves it from integration config or emits a needs-verification finding."
+        "note": "soft_pull_verified is a verification input, not an OfferCell column; the checker resolves it from integration config or emits a needs-verification finding.",
+        "safety_net_patterns": "@lexicons.soft_pull_claims"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if any step before final application triggers a hard inquiry. Flag for verification of the prequal flow configuration."
@@ -332,16 +414,20 @@
     {
       "rule_id": "XP-SOFT-007-credit_card",
       "product": "credit_card",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "A 'won't affect your credit score' claim is flagged until the flow is verified as soft-pull end-to-end before final application.",
-        "phrases": "@lexicons.soft_pull_claims",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "soft_pull_verified",
         "violates_when": false,
-        "note": "soft_pull_verified is a verification input, not an OfferCell column; the checker resolves it from integration config or emits a needs-verification finding."
+        "note": "soft_pull_verified is a verification input, not an OfferCell column; the checker resolves it from integration config or emits a needs-verification finding.",
+        "safety_net_patterns": "@lexicons.soft_pull_claims"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if any step before final application triggers a hard inquiry. Flag for verification of the prequal flow configuration."
@@ -349,16 +435,20 @@
     {
       "rule_id": "XP-SOFT-007-mortgage_prequal",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "A 'won't affect your credit score' claim on mortgage creative is flagged until the described stage is verified as soft-pull (mortgage flows mix soft-pull prequal and hard-pull preapproval).",
-        "phrases": "@lexicons.soft_pull_claims",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "soft_pull_verified",
         "violates_when": false,
-        "note": "Condition resolved from integration config or a needs-verification finding is emitted; verify which stage this creative describes."
+        "note": "Condition resolved from integration config or a needs-verification finding is emitted; verify which stage this creative describes.",
+        "safety_net_patterns": "@lexicons.soft_pull_claims"
       },
       "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
       "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if the described step triggers a hard inquiry. Mortgage flows mix soft-pull prequal and hard-pull preapproval — verify stage alignment."

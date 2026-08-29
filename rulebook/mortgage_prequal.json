@@ -5,14 +5,18 @@
     {
       "rule_id": "MTG-REGN-001",
       "product": "mortgage_prequal",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "Mortgage prequal creative may never use 'pre-approved', 'guaranteed', or any other approval-certainty language, regardless of offer flags.",
-        "phrases": "@lexicons.mortgage_approval_prohibited",
-        "match": "case_insensitive_substring"
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "match": "case_insensitive_substring",
+        "safety_net_patterns": "@lexicons.mortgage_approval_prohibited"
       },
       "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
       "explanation": "Reg N 12 CFR 1014.3(q) prohibits misrepresenting the likelihood of mortgage approval. Prequalification is not approval; 'pre-approved' badges/headlines on mortgage prequal placements are banned outright in this rulebook (offer matrix badge_designation_allowed is always 'prequalified' for mortgage)."
@@ -20,12 +24,16 @@
     {
       "rule_id": "MTG-FIXED-001",
       "product": "mortgage_prequal",
-      "claim_types": ["fixed_rate_representation"],
+      "claim_types": [
+        "fixed_rate_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "'Fixed' may not appear on a placement whose referenced mortgage offer carries a variable/adjustable rate.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
         "phrases": "@lexicons.fixed_terms",
         "condition_field": "apr_type",
         "violates_when": "variable"
@@ -36,16 +44,20 @@
     {
       "rule_id": "MTG-GOV-001",
       "product": "mortgage_prequal",
-      "claim_types": ["government_affiliation"],
+      "claim_types": [
+        "government_affiliation"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "phrase_conditional",
         "check_description": "Government-program vocabulary (FHA, HUD, VA, 'official notice') is flagged unless the offer is verified as a genuine government-program loan with no implied agency affiliation.",
-        "phrases": "@lexicons.government_affiliation_terms",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "condition_field": "government_program_verified",
         "violates_when": false,
-        "note": "government_program_verified is a verification input, not an OfferCell column: the checker resolves it from offer metadata or emits a needs-verification finding."
+        "note": "government_program_verified is a verification input, not an OfferCell column: the checker resolves it from offer metadata or emits a needs-verification finding.",
+        "safety_net_patterns": "@lexicons.government_affiliation_terms"
       },
       "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
       "explanation": "Reg N 12 CFR 1014.3(n) prohibits misrepresenting that the product is provided or endorsed by, or the provider affiliated with, any government entity. Government-program vocabulary is flagged for verification against the actual offer."
@@ -53,14 +65,20 @@
     {
       "rule_id": "MTG-TI-001",
       "product": "mortgage_prequal",
-      "claim_types": ["triggering_term"],
+      "claim_types": [
+        "triggering_term"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "trigger_requires_disclosures",
         "check_description": "Any monthly-payment figure on mortgage creative requires the disclosure that the payment excludes taxes and insurance.",
-        "trigger_patterns": "@patterns.payment_amount",
-        "required_disclosure_types": ["taxes_insurance"]
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "taxes_insurance"
+        ],
+        "safety_net_patterns": "@patterns.payment_amount"
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
       "explanation": "Reg Z 12 CFR 1026.24(f): first-lien payment advertisements must state that the payment excludes taxes and insurance and that the actual obligation will be higher. Any monthly-payment figure on mortgage creative requires the taxes-and-insurance disclosure; Reg N 1014.3(f) separately bans payment misrepresentation."
@@ -68,12 +86,16 @@
     {
       "rule_id": "MTG-NMLS-001",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "element_required",
         "check_description": "Every piece of mortgage creative must display the company's NMLS identifier.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
         "element": "nmls_id",
         "detection_ref": "@patterns.nmls_id"
       },
@@ -83,12 +105,16 @@
     {
       "rule_id": "MTG-RATE-001",
       "product": "mortgage_prequal",
-      "claim_types": ["rate_or_apr"],
+      "claim_types": [
+        "rate_or_apr"
+      ],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
         "check_type": "proximity_required",
         "check_description": "Mortgage rates must be labeled as APR, and any simple interest rate shown must sit with the APR at equal or lesser prominence.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
         "anchor_patterns": "@patterns.rate_percentage",
         "companion_patterns": "@patterns.apr_label",
         "requirement": "Rates must be stated as APR (labeled); where a simple interest rate also appears it must sit with the APR at equal prominence and close proximity, and may not be more conspicuous."
@@ -99,14 +125,18 @@
     {
       "rule_id": "MTG-DEBT-001",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "Debt-elimination language ('debt-free', 'eliminate your debt') is banned on dwelling-secured product marketing.",
-        "phrases": "@lexicons.debt_elimination",
-        "match": "case_insensitive_substring"
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "match": "case_insensitive_substring",
+        "safety_net_patterns": "@lexicons.debt_elimination"
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
       "explanation": "Reg Z 12 CFR 1026.24(i)(5) prohibits advertising claims that a dwelling-secured product will 'eliminate debt' or similar debt-elimination framing (a refinance restructures debt, it does not eliminate it); Reg N 1014.3(m) bans the equivalent misrepresentation of debt elimination."
@@ -114,16 +144,36 @@
     {
       "rule_id": "MTG-TRUTH-001",
       "product": "mortgage_prequal",
-      "claim_types": ["rate_or_apr", "triggering_term"],
+      "claim_types": [
+        "rate_or_apr",
+        "triggering_term"
+      ],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
         "check_type": "composite_all",
         "check_description": "Advertised mortgage rates and APRs must match the current offer-matrix window (mortgage pricing reprices ~daily) and must never conflate a simple rate with the APR.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
         "checks": [
-          {"check_type": "ground_truth_consistency", "claim_field": "rate_or_apr_value", "matrix_field": "apr_min..apr_max", "comparator": "within_range"},
-          {"check_type": "ground_truth_consistency", "claim_field": "review_date", "matrix_field": "effective_start..effective_end", "comparator": "within_range"},
-          {"check_type": "ground_truth_consistency", "claim_field": "rate_label", "matrix_field": "apr_range", "comparator": "not_conflated"}
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_or_apr_value",
+            "matrix_field": "apr_min..apr_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "review_date",
+            "matrix_field": "effective_start..effective_end",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_label",
+            "matrix_field": "apr_range",
+            "comparator": "not_conflated"
+          }
         ]
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
@@ -132,12 +182,16 @@
     {
       "rule_id": "MTG-COUNSEL-001",
       "product": "mortgage_prequal",
-      "claim_types": ["general_udaap_representation"],
+      "claim_types": [
+        "general_udaap_representation"
+      ],
       "check_kind": "deterministic",
       "severity": "medium",
       "parameters": {
         "check_type": "phrase_prohibited",
         "check_description": "A for-profit lender may not call itself or its staff 'counselors' in mortgage marketing.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
         "phrases": "@lexicons.counselor_terms",
         "match": "case_insensitive_substring"
       },
@@ -147,12 +201,16 @@
     {
       "rule_id": "MTG-JUDGE-001",
       "product": "mortgage_prequal",
-      "claim_types": ["approval_or_prequalification"],
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
       "check_kind": "llm_judged",
       "severity": "high",
       "parameters": {
         "judge_focus": "Is the prequalification framing honest about what it is? Look for: 'prequalified' presented with the weight of an approval, missing or buried 'this is not a loan approval' qualifiers (some states require it at >=14pt bold), rate-lock implications, and whether the CTA implies certainty a prequal cannot deliver.",
-        "required_disclosure_types": ["not_guaranteed"],
+        "required_disclosure_types": [
+          "not_guaranteed"
+        ],
         "violation_examples": [
           "Congratulations — your new home loan is waiting! Prequalified means you're ready to close.",
           "Lock in your 6.25% rate today with instant prequalification (no rate lock exists at prequal; qualifier absent)",

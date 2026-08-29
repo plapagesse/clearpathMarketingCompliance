@@ -1,5 +1,5 @@
 {
-  "rulebook_version": "2026.08.1",
+  "rulebook_version": "2026.08.2",
   "generated": "2026-08-29",
   "rule_files": [
     "personal_loan.json",
@@ -32,6 +32,10 @@
       "phrase_conditional": 12,
       "phrase_prohibited": 6,
       "element_required": 3
+    },
+    "by_binding": {
+      "token": 10,
+      "concept": 28
     }
   },
   "conventions": {

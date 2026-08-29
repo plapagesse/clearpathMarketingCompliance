@@ -32,5 +32,11 @@
   "deferred_interest": ["no interest (if|for)", "interest[- ]free", "0% interest for"],
   "if_paid_in_full": ["if paid in full"],
   "prequalified_terms": ["prequalified", "pre-qualified"],
-  "nmls_id": ["NMLS\\s?#?\\s?\\d{4,}"]
+  "nmls_id": ["NMLS\\s?#?\\s?\\d{4,}"],
+  "prescreen_optout_notice": [
+    "PRESCREEN & OPT[- ]OUT NOTICE",
+    "opt[- ]out notice",
+    "1-888-5-OPTOUT",
+    "1-888-567-8688"
+  ]
 }
