@@ -1,0 +1,283 @@
+{
+  "file": "cross_product.json",
+  "description": "Cross-product rules (UDAAP lexicon, badge qualifiers, substantiation, urgency, endorsements, soft-pull claims). RulebookEntry.product is single-valued, so each conceptual rule is expanded into three concrete entries sharing a family prefix: XP-<FAMILY>-<NNN>-<product>.",
+  "rules": [
+    {
+      "rule_id": "XP-UDAAP-001-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["approval", "other"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "prohibited_phrases": ["guaranteed approval", "regardless of credit", "no credit check", "everyone qualifies", "everyone is approved", "cannot be denied", "can't be denied", "risk-free loan"],
+        "match": "case_insensitive_substring"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
+    },
+    {
+      "rule_id": "XP-UDAAP-001-credit_card",
+      "product": "credit_card",
+      "claim_types": ["approval", "other"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "prohibited_phrases": ["guaranteed approval", "regardless of credit", "no credit check", "everyone qualifies", "everyone is approved", "cannot be denied", "can't be denied", "risk-free"],
+        "match": "case_insensitive_substring"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
+    },
+    {
+      "rule_id": "XP-UDAAP-001-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["approval", "other"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "prohibited_phrases": ["guaranteed approval", "regardless of credit", "no credit check", "everyone qualifies", "everyone is approved", "cannot be denied", "can't be denied", "risk-free"],
+        "match": "case_insensitive_substring",
+        "note": "overlaps MTG-REGN-001 for approval phrases; checker dedupes findings by (claim, phrase) keeping the highest-severity rule"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "UDAAP/FTC Act Section 5 lexicon: approval-certainty phrases are deceptive wherever any underwriting or screening exists. These are per-se prohibited across products."
+    },
+    {
+      "rule_id": "XP-PREQ-002-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["approval"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "flag_phrases": ["prequalified", "pre-qualified"],
+        "match": "case_insensitive_substring",
+        "required_disclosure_types": ["not_guaranteed"]
+      },
+      "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+      "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier so the net impression matches what a prequalification actually is."
+    },
+    {
+      "rule_id": "XP-PREQ-002-credit_card",
+      "product": "credit_card",
+      "claim_types": ["approval"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "flag_phrases": ["prequalified", "pre-qualified"],
+        "match": "case_insensitive_substring",
+        "required_disclosure_types": ["not_guaranteed"]
+      },
+      "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+      "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier so the net impression matches what a prequalification actually is."
+    },
+    {
+      "rule_id": "XP-PREQ-002-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["approval"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "flag_phrases": ["prequalified", "pre-qualified"],
+        "match": "case_insensitive_substring",
+        "required_disclosure_types": ["not_guaranteed"]
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "'Prequalified' is permitted but conditional: the creative must carry an adjacent approval-not-guaranteed qualifier (for mortgage, some states additionally require an explicit 'this is not a loan approval' legend)."
+    },
+    {
+      "rule_id": "XP-COMP-003-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["comparison"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Superlative/comparative claims ('lowest rates', 'best loan', 'beats any offer'): is there plausible current-market substantiation, or is this a measurable claim presented without basis? Distinguish puffery ('great rates') from measurable superlatives ('lowest APR available')."
+      },
+      "citation_url": "https://www.ftc.gov/system/files/documents/public_statements/410531/831014deceptionstmt.pdf",
+      "explanation": "FTC substantiation doctrine: objective comparative claims require a reasonable basis at the time they are made. Measurable superlatives without substantiation are deceptive."
+    },
+    {
+      "rule_id": "XP-COMP-003-credit_card",
+      "product": "credit_card",
+      "claim_types": ["comparison"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Superlative/comparative claims ('lowest rates', 'best card', 'highest cash back'): is there plausible current-market substantiation, or is this a measurable claim presented without basis? Distinguish puffery from measurable superlatives."
+      },
+      "citation_url": "https://www.ftc.gov/system/files/documents/public_statements/410531/831014deceptionstmt.pdf",
+      "explanation": "FTC substantiation doctrine: objective comparative claims require a reasonable basis at the time they are made. Measurable superlatives without substantiation are deceptive."
+    },
+    {
+      "rule_id": "XP-COMP-003-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["comparison"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Superlative/comparative claims ('lowest rates', 'best mortgage'): is there plausible current-market substantiation? Reg N 1014.3 additionally bans misrepresenting comparisons between mortgage products, including partial-period comparisons."
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "FTC substantiation doctrine plus Reg N comparison prohibitions: objective comparative mortgage claims require a reasonable basis; comparisons using less than the full loan term are banned."
+    },
+    {
+      "rule_id": "XP-URG-004-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["urgency"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["act now", "expires today", "limited time", "only today", "final notice", "last chance", "offer ends"],
+        "match": "case_insensitive_substring",
+        "condition": "acceptable only when the referenced offer cell has a real effective_end consistent with the urgency claim"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "Fake-urgency devices are deceptive dark patterns unless the offer genuinely expires when the ad says it does. Flag and reconcile against the offer matrix effective window."
+    },
+    {
+      "rule_id": "XP-URG-004-credit_card",
+      "product": "credit_card",
+      "claim_types": ["urgency"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["act now", "expires today", "limited time", "only today", "final notice", "last chance", "offer ends"],
+        "match": "case_insensitive_substring",
+        "condition": "acceptable only when the referenced offer cell has a real effective_end consistent with the urgency claim"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "Fake-urgency devices are deceptive dark patterns unless the offer genuinely expires when the ad says it does. Flag and reconcile against the offer matrix effective window."
+    },
+    {
+      "rule_id": "XP-URG-004-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["urgency"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["act now", "expires today", "limited time", "only today", "final notice", "last chance", "rates won't last"],
+        "match": "case_insensitive_substring",
+        "condition": "acceptable only when tied to a real pricing window; 'final notice'/'official notice' framing also implicates Reg N fake-source prohibitions"
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "Fake-urgency devices are deceptive unless tied to a real expiration; on mortgage creative, urgency dressed as an official/final notice also violates Reg N's misrepresentation-of-source prohibitions."
+    },
+    {
+      "rule_id": "XP-ODDS-005-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["approval"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Approval-odds claims ('90% approval odds', 'outstanding approval odds'): does the integration type support them (lender-decisioned prequal vs partner odds model)? Is there a substantiation basis mapping the number/label to realized approval rates for this channel? Flag any odds language lacking a documented basis.",
+        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"]
+      },
+      "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+      "explanation": "FTC v. Credit Karma: odds/likelihood claims must be substantiated by realized approval rates for comparable applicants; unsupported odds framing is deceptive."
+    },
+    {
+      "rule_id": "XP-ODDS-005-credit_card",
+      "product": "credit_card",
+      "claim_types": ["approval"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Approval-odds claims ('90% approval odds', 'excellent approval odds'): does the integration type support them? Is there a substantiation basis mapping the number/label to realized approval rates for this channel? Flag any odds language lacking a documented basis.",
+        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"]
+      },
+      "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+      "explanation": "FTC v. Credit Karma: odds/likelihood claims must be substantiated by realized approval rates for comparable applicants; unsupported odds framing is deceptive."
+    },
+    {
+      "rule_id": "XP-ODDS-005-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["approval"],
+      "check_kind": "llm_judged",
+      "severity": "critical",
+      "parameters": {
+        "judge_focus": "Any approval-odds framing on mortgage prequal creative: Reg N 1014.3(q) bans misrepresenting approval likelihood outright — treat numeric odds claims on mortgage as presumptively non-compliant, not merely unsubstantiated.",
+        "detect_patterns": ["\\b\\d{1,3}\\s?%\\s?(approval )?odds", "approval odds", "excellent odds", "outstanding odds"]
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "On mortgage creative, approval-likelihood claims sit under Reg N's explicit prohibition rather than the general substantiation standard — severity is elevated to critical."
+    },
+    {
+      "rule_id": "XP-TEST-006-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["testimonial"],
+      "check_kind": "llm_judged",
+      "severity": "medium",
+      "parameters": {
+        "judge_focus": "Testimonials/endorsements: is any material connection (payment, free product, affiliate bounty) disclosed unavoidably in the same medium as the claim? Do experience claims ('I save $400/month') represent generally achievable results, with generally-expected performance disclosed?"
+      },
+      "citation_url": "https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-255",
+      "explanation": "FTC Endorsement Guides (16 CFR 255, 2023 revision): material connections must be clearly and unavoidably disclosed; there is no 'results not typical' safe harbor — atypical results require disclosure of generally expected performance."
+    },
+    {
+      "rule_id": "XP-TEST-006-credit_card",
+      "product": "credit_card",
+      "claim_types": ["testimonial"],
+      "check_kind": "llm_judged",
+      "severity": "medium",
+      "parameters": {
+        "judge_focus": "Testimonials/endorsements: is any material connection (payment, free product, affiliate bounty) disclosed unavoidably in the same medium as the claim? Do experience claims (rewards earned, credit-score improvement) represent generally achievable results?"
+      },
+      "citation_url": "https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-255",
+      "explanation": "FTC Endorsement Guides (16 CFR 255, 2023 revision): material connections must be clearly and unavoidably disclosed; atypical results require disclosure of generally expected performance."
+    },
+    {
+      "rule_id": "XP-TEST-006-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["testimonial"],
+      "check_kind": "llm_judged",
+      "severity": "medium",
+      "parameters": {
+        "judge_focus": "Testimonials/endorsements on mortgage creative: material-connection disclosure, generally-achievable results, and Reg N overlay — testimonial content may not carry misrepresentations the lender could not make directly (rates, savings, approval)."
+      },
+      "citation_url": "https://www.ecfr.gov/current/title-16/chapter-I/subchapter-B/part-255",
+      "explanation": "FTC Endorsement Guides plus Reg N: endorser statements are the advertiser's claims; a testimonial cannot launder a prohibited mortgage misrepresentation."
+    },
+    {
+      "rule_id": "XP-SOFT-007-personal_loan",
+      "product": "personal_loan",
+      "claim_types": ["other"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["won't affect your credit score", "no impact to your credit", "doesn't hurt your score", "won't hurt your credit"],
+        "match": "case_insensitive_substring",
+        "condition": "true only when the flow is soft-pull end-to-end until final application; verify integration config and that hard-pull consent appears at application"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if any step before final application triggers a hard inquiry. Flag for verification of the prequal flow configuration."
+    },
+    {
+      "rule_id": "XP-SOFT-007-credit_card",
+      "product": "credit_card",
+      "claim_types": ["other"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["won't affect your credit score", "no impact to your credit", "doesn't hurt your score", "won't hurt your credit"],
+        "match": "case_insensitive_substring",
+        "condition": "true only when the flow is soft-pull end-to-end until final application; verify integration config and that hard-pull consent appears at application"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if any step before final application triggers a hard inquiry. Flag for verification of the prequal flow configuration."
+    },
+    {
+      "rule_id": "XP-SOFT-007-mortgage_prequal",
+      "product": "mortgage_prequal",
+      "claim_types": ["other"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "flag_phrases": ["won't affect your credit score", "no impact to your credit", "doesn't hurt your score", "won't hurt your credit"],
+        "match": "case_insensitive_substring",
+        "condition": "true only when the prequal flow is soft-pull; mortgage prequals commonly hard-pull at preapproval stage — verify which stage this creative describes"
+      },
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "explanation": "Soft-pull claims are conditional truth claims about the integration: deceptive if the described step triggers a hard inquiry. Mortgage flows mix soft-pull prequal and hard-pull preapproval — verify stage alignment."
+    }
+  ]
+}

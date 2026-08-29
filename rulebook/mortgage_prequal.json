@@ -1,0 +1,147 @@
+{
+  "file": "mortgage_prequal.json",
+  "description": "Mortgage prequalification marketing rules: Regulation N (MAP Rule) prohibitions, Reg Z 1026.24 mortgage-specific provisions, NMLS/state display requirements.",
+  "rules": [
+    {
+      "rule_id": "MTG-REGN-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["approval"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "prohibited_phrases": ["pre-approved", "preapproved", "guaranteed approval", "guaranteed rate", "you are approved", "everyone qualifies"],
+        "match": "case_insensitive_substring",
+        "no_condition": "prohibited regardless of offer flags — mortgage prequal marketing may never claim or imply approval likelihood beyond 'prequalified' with qualifiers"
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "Reg N 12 CFR 1014.3(q) prohibits misrepresenting the likelihood of mortgage approval. Prequalification is not approval; 'pre-approved' badges/headlines on mortgage prequal placements are banned outright in this rulebook (offer matrix badge_designation_allowed is always 'prequalified' for mortgage)."
+    },
+    {
+      "rule_id": "MTG-FIXED-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["rate"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "conditional_phrases": [
+          {"phrase": "fixed", "condition_field": "apr_type", "violates_when": "variable"}
+        ],
+        "match": "case_insensitive_substring"
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "Reg N 12 CFR 1014.3 prohibits misrepresenting whether a rate is fixed or adjustable; Reg Z 1026.24(i)(1) separately bans advertising a variable dwelling-secured rate as 'fixed'. Any 'fixed' language on a placement referencing an ARM offer cell is a critical violation."
+    },
+    {
+      "rule_id": "MTG-GOV-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["other", "approval"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "flag_phrases": ["FHA", "HUD", "VA loan", "government-backed", "government program", "federally endorsed", "official notice"],
+        "match": "case_insensitive_substring",
+        "disposition": "flag_for_verification — permitted only when the offer is genuinely a government-program loan and no affiliation with a government agency is implied"
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "Reg N 12 CFR 1014.3(k)-(l) prohibits misrepresenting government affiliation or that a product is endorsed by/part of a government program. Government-program vocabulary is flagged for verification against the actual offer."
+    },
+    {
+      "rule_id": "MTG-TI-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["payment"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "payment_patterns": ["\\$\\s?[\\d,]+(\\.\\d{2})?\\s?(/|per\\s)?mo(nth)?", "monthly (P&I )?payment"],
+        "match": "case_insensitive_regex",
+        "required_disclosure_types": ["taxes_insurance"]
+      },
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "explanation": "Reg Z 12 CFR 1026.24(f): first-lien payment advertisements must state that the payment excludes taxes and insurance and that the actual obligation will be higher. Any monthly-payment figure on mortgage creative requires the taxes-and-insurance disclosure; Reg N 1014.3(f) separately bans payment misrepresentation."
+    },
+    {
+      "rule_id": "MTG-NMLS-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["other"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "required_disclosure_types": ["nmls_id"],
+        "pattern": "NMLS\\s?#?\\s?\\d{4,}"
+      },
+      "citation_url": "https://law.lis.virginia.gov/admincode/title10/agency5/chapter160/section60/",
+      "explanation": "SAFE Act-derived state rules (e.g. Virginia 10VAC5-160-60) require the company NMLS unique identifier on mortgage advertising, websites, and social profiles. Every mortgage creative must display the NMLS ID."
+    },
+    {
+      "rule_id": "MTG-RATE-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["rate"],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "rate_patterns": ["\\b\\d{1,2}(\\.\\d{1,3})?\\s?%"],
+        "require_apr_label": true,
+        "equal_prominence": "when both an interest rate and an APR are shown, each with equal prominence and close proximity; rate may not be more conspicuous than APR"
+      },
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "explanation": "Reg Z 12 CFR 1026.24(b)-(c),(f): mortgage rate ads must state rates as APR (labeled); where a simple interest rate also appears it must sit with the APR at equal-or-lesser prominence."
+    },
+    {
+      "rule_id": "MTG-DEBT-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["other", "comparison"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "prohibited_phrases": ["eliminate your debt", "debt-free", "erase your debt", "wipe out your debt", "eliminate debt"],
+        "match": "case_insensitive_substring"
+      },
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "explanation": "Reg Z 12 CFR 1026.24(i)(5) prohibits advertising claims that a dwelling-secured product will 'eliminate debt' or similar debt-elimination framing (a refinance restructures debt, it does not eliminate it); Reg N 1014.3(m) bans the equivalent misrepresentation of debt elimination."
+    },
+    {
+      "rule_id": "MTG-TRUTH-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["rate", "payment"],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "matrix_checks": [
+          "claimed_rate_or_apr_within_offer_range",
+          "offer_effective_window_contains_today",
+          "rate_vs_apr_not_conflated"
+        ],
+        "staleness_note": "mortgage cells carry ~3-day effective windows because pricing reprices daily; expired windows are automatic truthfulness failures"
+      },
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "explanation": "Advertised mortgage rates/APRs must match the current offer-matrix window. Because mortgage pricing reprices ~daily, the effective_end check is the primary staleness control (the Amerisave third-party rate-table fact pattern)."
+    },
+    {
+      "rule_id": "MTG-COUNSEL-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["other"],
+      "check_kind": "deterministic",
+      "severity": "medium",
+      "parameters": {
+        "prohibited_phrases": ["counselor", "counseling service", "housing counselor"],
+        "match": "case_insensitive_substring",
+        "scope": "for-profit lender marketing may not describe itself or its staff as counselors"
+      },
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "explanation": "Reg Z 12 CFR 1026.24(i)(6) prohibits a for-profit mortgage creditor from using the term 'counselor' to refer to itself or its employees in advertising."
+    },
+    {
+      "rule_id": "MTG-JUDGE-001",
+      "product": "mortgage_prequal",
+      "claim_types": ["approval"],
+      "check_kind": "llm_judged",
+      "severity": "high",
+      "parameters": {
+        "judge_focus": "Is the prequalification framing honest about what it is? Look for: 'prequalified' presented with the weight of an approval, missing or buried 'this is not a loan approval' qualifiers (some states require it at >=14pt bold), rate-lock implications, and whether the CTA implies certainty a prequal cannot deliver.",
+        "required_disclosure_types": ["not_guaranteed"]
+      },
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "explanation": "Reg N 1014.3(q) net-impression zone: even without banned phrases, a prequal placement can imply approval certainty through design and framing. The judge assesses whether qualifiers adequately counter the overall impression."
+    }
+  ]
+}

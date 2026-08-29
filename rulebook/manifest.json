@@ -1,0 +1,26 @@
+{
+  "rulebook_version": "2026.08.0",
+  "generated": "2026-08-29",
+  "rule_files": [
+    "personal_loan.json",
+    "credit_card.json",
+    "mortgage_prequal.json",
+    "cross_product.json"
+  ],
+  "counts": {
+    "total": 51,
+    "by_product": {
+      "personal_loan": 17,
+      "credit_card": 17,
+      "mortgage_prequal": 17
+    },
+    "by_check_kind": {
+      "deterministic": 38,
+      "llm_judged": 13
+    }
+  },
+  "conventions": {
+    "cross_product_expansion": "RulebookEntry.product is single-valued; cross-product rules are expanded per product with rule_id family prefix XP-<FAMILY>-<NNN>-<product>",
+    "versioning": "rulebook_version = YYYY.MM.patch; bump patch for rule edits, month for additions; CheckRun.rulebook_version records what each run executed against"
+  }
+}
