@@ -21,7 +21,15 @@
         ],
         "safety_net_patterns": "@patterns.triggering_terms_open_end"
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16(b)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.16(b): open-end trigger terms include NEGATIVE claims — 'no annual fee' triggers disclosure of any finance charge/periodic rate (stated as APR, with its variable nature) and other fees. Cards ads triggering must carry the companion disclosures."
     },
     {
@@ -41,7 +49,15 @@
         "companion_patterns": "@patterns.intro_words",
         "requirement": "Companion in immediate proximity to EVERY listing of the promotional rate (maps to DisclosureType.intro_adjacency)."
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16(g)(3)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.16(g)(3): a promotional rate must be identified as 'introductory'/'intro' in immediate proximity to each listing of the rate. This is a layout/proximity requirement, not merely a presence requirement."
     },
     {
@@ -61,7 +77,15 @@
         "companion_patterns": "@patterns.promo_end_and_post_rate",
         "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate."
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16(g)(4)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.16(g)(4): ads stating a promotional rate must state when it ends and the post-promotional APR (or range, if creditworthiness-dependent), closely proximate to the first listing."
     },
     {
@@ -93,7 +117,15 @@
           }
         ]
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16(h)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.16(h): deferred-interest offers must carry 'if paid in full' in immediate proximity to each 'no interest' statement, plus disclosure that interest accrues from the purchase date and is charged retroactively if the balance is not paid in full by the deadline."
     },
     {
@@ -114,7 +146,15 @@
         "violates_when": "variable",
         "required_qualifier": "state the period during which the rate is fixed, or only use for rates that cannot increase"
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16(f)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.16(f): 'fixed' may describe an open-end rate only if a period is specified during which it will not change or if it truly cannot increase. Calling a variable-APR card rate 'fixed' is a violation."
     },
     {
@@ -140,7 +180,15 @@
           ]
         }
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/60/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.60",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/60/"
+        }
+      ],
       "explanation": "Reg Z 12 CFR 1026.60: card applications and solicitations (direct mail and electronic) must present the standardized rate/fee table (Schumer box) or, for electronic solicitations, an unavoidable link/reference to it."
     },
     {
@@ -164,7 +212,22 @@
         "note": "Format expectations for reviewers: short notice on front/first page, larger than principal text, >=12pt, bordered, states opt-out right + 1-888-5-OPTOUT, points to long notice; long notice >=8pt with 'PRESCREEN & OPT-OUT NOTICE' heading in capitals.",
         "detection_ref": "@patterns.prescreen_optout_notice"
       },
-      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1022.54",
+      "authorities": [
+        {
+          "body": "Fair Credit Reporting Act",
+          "citation": "15 U.S.C. § 1681m(d)",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.law.cornell.edu/uscode/text/15/1681m"
+        },
+        {
+          "body": "Regulation V (FCRA prescreen opt-out notice format)",
+          "citation": "12 CFR § 1022.54",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.law.cornell.edu/cfr/text/12/1022.54"
+        }
+      ],
       "explanation": "FCRA 15 USC 1681m(d) + 12 CFR 1022.54: prescreened firm offers must carry the short-form opt-out notice (page one, >=12pt, bordered) and the long-form notice with all statutory elements. Missing or malformed notices on a firm-offer creative are per-se violations."
     },
     {
@@ -185,7 +248,22 @@
         "note": "Checker should also reconcile submission.badge_text against offer.badge_designation_allowed.",
         "safety_net_patterns": "@lexicons.preapproved_terms"
       },
-      "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+      "authorities": [
+        {
+          "body": "Fair Credit Reporting Act",
+          "citation": "15 U.S.C. § 1681a(l)",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.law.cornell.edu/uscode/text/15/1681a"
+        },
+        {
+          "body": "FTC Act § 5 deception doctrine (FTC v. Credit Karma)",
+          "citation": "15 U.S.C. § 45(a)",
+          "regime": "enforcement_doctrine",
+          "regulator": "FTC",
+          "url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims"
+        }
+      ],
       "explanation": "'Pre-approved' for a card requires a true FCRA firm offer (is_firm_offer=true on the referenced offer cell). Marketplace prequal placements (odds-model matches) must use 'prequalified'. FTC v. Credit Karma is the controlling precedent."
     },
     {
@@ -236,7 +314,22 @@
           }
         ]
       },
-      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.16",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+        },
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+        }
+      ],
       "explanation": "Every advertised card number (intro APR, intro period, post-promo range, annual fee) must match the referenced offer-matrix cells at their current version. Stale promotional terms on live partner surfaces are deceptive advertising."
     },
     {
@@ -257,15 +350,34 @@
         "compliant_contrast": "Earn 1.5% unlimited cash back on every purchase. New cardmembers: $200 bonus after spending $1,000 in the first 3 months.",
         "citation_quote": "Likewise, oral or fine print disclosures or contract disclosures may be insufficient to cure a misleading headline or a prominent written representation."
       },
-      "citation_url": "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf",
+      "authorities": [
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf"
+        },
+        {
+          "body": "FTC Act Section 5",
+          "citation": "15 U.S.C. § 45(a)",
+          "regime": "statute",
+          "regulator": "FTC",
+          "url": "https://www.law.cornell.edu/uscode/text/15/45"
+        }
+      ],
       "explanation": "Rewards and superlative card claims are judged on net impression and substantiation; undisclosed caps or redemption restrictions that contradict an 'unlimited' headline are deceptive."
     }
   ],
   "citation_index": [
     "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
     "https://www.consumerfinance.gov/rules-policy/regulations/1026/60/",
+    "https://www.law.cornell.edu/uscode/text/15/1681m",
     "https://www.law.cornell.edu/cfr/text/12/1022.54",
+    "https://www.law.cornell.edu/uscode/text/15/1681a",
     "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
-    "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf"
+    "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+    "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf",
+    "https://www.law.cornell.edu/uscode/text/15/45"
   ]
 }

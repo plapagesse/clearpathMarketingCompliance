@@ -1,8 +1,23 @@
 # Rulebook
 
 Machine-actionable compliance rules for the ClearPath marketing-compliance engine.
-Every entry conforms to `RulebookEntry` in `backend/contracts.py` and carries a real
-`citation_url` (eCFR/CFPB/FTC/Cornell or state source) plus a plain-language `explanation`.
+Every entry conforms to `RulebookEntry` in `backend/contracts.py` and carries structured
+`authorities` (a non-empty list of `LegalAuthority` objects — body, pinpoint citation,
+regime, regulator, url; primary first) plus a plain-language `explanation`. The `regime`
+field is honest about what kind of law each authority is: the Endorsement Guides are an
+`agency_guide`, substantiation/odds rules rest on `enforcement_doctrine`, state rate caps
+are `state_statute`.
+
+## What is a rule
+
+A rule is a **(scope, single decidable predicate, authority, consequence)** quadruple:
+*scope* (product + claim_types + any surface/offer gating), one *predicate* that decides
+pass/fail, the *authorities* it operationalizes, and a *consequence* (one finding kind at
+one severity with one explanation). The boundary is the **one-finding test**: every
+violation of the rule produces one kind of finding, one explanation, one severity. If
+articulating a violation needs two different explanations, that is two rules. If two
+rules always fire together and share one explanation, that is one rule. This is
+normative for all future rule additions.
 
 Rule `claim_types` use the **legal-entity taxonomy** (ClaimType enum, amended
 2026-08-29): triggering_term, rate_or_apr, promotional_or_introductory,
@@ -19,7 +34,7 @@ endorsement_or_testimonial, government_affiliation, general_udaap_representation
 | `credit_card.json` | Reg Z open-end (12 CFR 1026.16, 1026.60): negative-claim triggers, intro-rate adjacency/proximity, deferred interest, "fixed", Schumer box, FCRA prescreen format |
 | `mortgage_prequal.json` | Reg N (12 CFR 1014.3) prohibitions, Reg Z mortgage provisions, NMLS display, taxes-&-insurance, staleness |
 | `cross_product.json` | UDAAP lexicon, "prequalified" qualifiers, substantiation, urgency, endorsements, soft-pull claims — expanded per product (see below) |
-| `claim_types_legal_map.json` | ClaimType enum definition doc: every value → legal anchor (honest about doctrine-vs-statute) |
+| `claim_types_legal_map.json` | ClaimType classification spec: definitions, positive/near-miss examples, structured authorities, and `normalized_fields` — the extractor↔checker payload CONTRACT per type (injected into the Stage-3 extractor prompt) |
 | `data/lexicons.json` | Shared phrase lists (referenced via `@lexicons.<key>`) |
 | `data/patterns.json` | Shared regex sets (referenced via `@patterns.<key>`) |
 | `data/state_apr_caps.json` | State APR cap table (referenced via `@state_apr_caps.<key>`) |
@@ -105,7 +120,7 @@ Additional conventions:
 - **Pattern-key placement by plane:** `phrase_prohibited`/`phrase_conditional` carry `phrases` and `trigger_requires_disclosures` carries `trigger_patterns` ONLY on text_plane rules; on claim_plane rules the same data appears as `safety_net_patterns` (secondary detectors). Token-bound rules must carry at least one resolvable pattern-bearing key; text_plane `element_required` rules must carry `detection_ref`.
 - `applies_when` variants: `{"offer_field": F, "equals": V}` (gate on the referenced offer cell), `{"surface_in": [...]}` (gate on `Submission.surface`), `{"any_anchor_matched": true}` (inside `composite_all`: gate on a sibling proximity check's anchors having matched).
 - **Verification-input condition fields:** some `condition_field` values are not `OfferCell` columns (`soft_pull_verified`, `government_program_verified`, `effective_end_supports_urgency`). The checker resolves them from integration config / derives them from the matrix as described in each rule's `note`; an unresolvable condition emits a needs-verification finding rather than passing silently.
-- Findings inherit the rule's `severity` and `citation_url`. Overlapping hits (e.g. `XP-UDAAP-001-mortgage_prequal` vs `MTG-REGN-001`) dedupe by (claim, phrase), keeping the highest-severity rule.
+- Findings inherit the rule's `severity` and surface its PRIMARY authority's url. Overlapping hits (e.g. `XP-UDAAP-001-mortgage_prequal` vs `MTG-REGN-001`) dedupe by (claim, phrase), keeping the highest-severity rule.
 
 **LLM judge (check_kind = `llm_judged`)** rules carry: `judge_focus` (the question),
 `violation_examples` (2-3 creative sentences that fail), `compliant_contrast` (one that

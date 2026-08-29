@@ -33,6 +33,35 @@ DISCLOSURE_VALUES = {d.value for d in DisclosureType}
 DATA_FILES = ("lexicons", "patterns", "state_apr_caps")
 BINDINGS = {"token", "concept"}
 PLANES = {"text_plane", "claim_plane"}
+AUTHORITY_REGIMES = {
+    "statute", "regulation", "official_interpretation", "agency_guide",
+    "enforcement_doctrine", "state_statute", "state_regulation",
+}
+CITATION_RE = __import__("re").compile(r"\d+ (CFR|U\.S\.C\.) § ?[\d.]+")
+
+
+def validate_authorities(auths, owner: str, errors: list[str]) -> None:
+    """Validate a list of LegalAuthority-shaped dicts (rules and claim-type map)."""
+    if not (isinstance(auths, list) and auths):
+        errors.append(f"{owner}: authorities must be a non-empty list")
+        return
+    for i, a in enumerate(auths):
+        if not isinstance(a, dict):
+            errors.append(f"{owner}: authorities[{i}] is not an object")
+            continue
+        for key in ("body", "citation", "regime", "regulator", "url"):
+            if not (isinstance(a.get(key), str) and a[key].strip()):
+                errors.append(f"{owner}: authorities[{i}] missing/empty {key!r}")
+        regime = a.get("regime")
+        if regime not in AUTHORITY_REGIMES:
+            errors.append(f"{owner}: authorities[{i}] invalid regime {regime!r}")
+        cite = a.get("citation", "")
+        if regime in {"state_statute", "state_regulation"}:
+            pass  # named state statutes/regs use their own citation formats
+        elif not CITATION_RE.search(cite):
+            errors.append(f"{owner}: authorities[{i}] citation fails format sanity: {cite!r}")
+        if isinstance(a.get("url"), str) and not a["url"].startswith("http"):
+            errors.append(f"{owner}: authorities[{i}] url is not a URL")
 PATTERN_KEYS = ("phrases", "trigger_patterns", "anchor_patterns", "companion_patterns", "detection_ref", "safety_net_patterns")
 
 
@@ -249,13 +278,37 @@ def main() -> int:
 
     map_path = RULEBOOK_DIR / "claim_types_legal_map.json"
     if map_path.exists():
-        mapped = set(json.loads(map_path.read_text()).get("claim_types", {}))
+        map_types = json.loads(map_path.read_text()).get("claim_types", {})
+        mapped = set(map_types)
         enum_values = {c.value for c in ClaimType}
         if mapped != enum_values:
             errors.append(
                 f"claim_types_legal_map.json misaligned with ClaimType enum "
                 f"(missing={sorted(enum_values - mapped)}, extra={sorted(mapped - enum_values)})"
             )
+        for ct_name, spec in map_types.items():
+            owner = f"claim_types_legal_map.{ct_name}"
+            if "citation_url" in spec:
+                errors.append(f"{owner}: still carries citation_url (migrate to authorities)")
+            validate_authorities(spec.get("authorities"), owner, errors)
+            if not (isinstance(spec.get("definition"), str) and spec["definition"].strip()):
+                errors.append(f"{owner}: missing definition")
+            ex = spec.get("examples")
+            if not isinstance(ex, dict):
+                errors.append(f"{owner}: missing examples")
+            else:
+                pos = ex.get("positive")
+                if not (_is_str_list(pos) and len(pos) >= 2):
+                    errors.append(f"{owner}: examples.positive needs >=2 strings")
+                neg = ex.get("negative")
+                if not (isinstance(neg, list) and len(neg) >= 1 and all(
+                    isinstance(n, dict) and isinstance(n.get("span"), str) and isinstance(n.get("reason"), str)
+                    for n in neg
+                )):
+                    errors.append(f"{owner}: examples.negative needs >=1 {{span, reason}} objects")
+            nf = spec.get("normalized_fields")
+            if not (isinstance(nf, dict) and nf):
+                errors.append(f"{owner}: missing/empty normalized_fields")
     else:
         errors.append("missing claim_types_legal_map.json")
 
@@ -263,6 +316,8 @@ def main() -> int:
     by_kind: Counter[str] = Counter()
     by_check_type: Counter[str] = Counter()
     by_binding: Counter[str] = Counter()
+    by_primary_body: Counter[str] = Counter()
+    multi_authority = 0
     seen_ids: set[str] = set()
     total = 0
 
@@ -286,9 +341,15 @@ def main() -> int:
                 continue
             by_product[entry.product.value] += 1
             by_kind[entry.check_kind.value] += 1
-            if not entry.citation_url.startswith("http"):
-                errors.append(f"{rid}: citation_url is not a URL")
-            used_citations.add(entry.citation_url)
+            if "citation_url" in raw:
+                errors.append(f"{rid}: still carries citation_url (migrate to authorities)")
+            validate_authorities(raw.get("authorities"), rid, errors)
+            if entry.authorities:
+                by_primary_body[entry.authorities[0].body] += 1
+                if len(entry.authorities) > 1:
+                    multi_authority += 1
+                for a in entry.authorities:
+                    used_citations.add(a.url)
 
             if entry.check_kind == CheckKind.DETERMINISTIC:
                 plane = entry.parameters.get("decision_inputs")
@@ -327,6 +388,8 @@ def main() -> int:
     print(f"by check_kind: {dict(by_kind)}")
     print(f"by check_type (deterministic primitives): {dict(by_check_type)}")
     print(f"by binding (deterministic): {dict(by_binding)}")
+    print(f"by primary body of law: {dict(by_primary_body)}")
+    print(f"multi-authority rules: {multi_authority}")
 
     declared = manifest.get("counts", {})
     if declared.get("total") != total:

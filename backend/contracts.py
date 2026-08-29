@@ -125,6 +125,26 @@ class Disclosure(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
+class AuthorityRegime(str, Enum):
+    STATUTE = "statute"
+    REGULATION = "regulation"
+    OFFICIAL_INTERPRETATION = "official_interpretation"
+    AGENCY_GUIDE = "agency_guide"
+    ENFORCEMENT_DOCTRINE = "enforcement_doctrine"
+    STATE_STATUTE = "state_statute"
+    STATE_REGULATION = "state_regulation"
+
+
+class LegalAuthority(BaseModel):
+    """One body of law a rule rests on, with a pinpoint citation."""
+
+    body: str = Field(description="Human name, e.g. 'Regulation Z (Truth in Lending Act)'")
+    citation: str = Field(description="Formal pinpoint cite, e.g. '12 CFR § 1026.24(d)(2)'")
+    regime: AuthorityRegime
+    regulator: str = Field(description="CFPB | FTC | state name")
+    url: str
+
+
 class RulebookEntry(BaseModel):
     """One machine-actionable compliance rule."""
 
@@ -137,7 +157,9 @@ class RulebookEntry(BaseModel):
         default_factory=dict,
         description="Machine-actionable data: trigger-term lists, required disclosures, phrase lexicon, caps",
     )
-    citation_url: str
+    authorities: list[LegalAuthority] = Field(
+        min_length=1, description="Authorities this rule operationalizes; primary authority first"
+    )
     explanation: str = Field(description="Plain-language rationale, shown to reviewers and fed to the LLM judge")
 
 

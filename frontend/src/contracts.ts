@@ -57,6 +57,23 @@ export interface Disclosure {
   prominence: string
 }
 
+export type AuthorityRegime =
+  | 'statute'
+  | 'regulation'
+  | 'official_interpretation'
+  | 'agency_guide'
+  | 'enforcement_doctrine'
+  | 'state_statute'
+  | 'state_regulation'
+
+export interface LegalAuthority {
+  body: string // e.g. 'Regulation Z (Truth in Lending Act)'
+  citation: string // pinpoint cite, e.g. '12 CFR § 1026.24(d)(2)'
+  regime: AuthorityRegime
+  regulator: string // CFPB | FTC | state name
+  url: string
+}
+
 export interface RulebookEntry {
   rule_id: string
   product: Product
@@ -64,7 +81,7 @@ export interface RulebookEntry {
   check_kind: CheckKind
   severity: Severity
   parameters: Record<string, unknown>
-  citation_url: string
+  authorities: LegalAuthority[] // min length 1; primary first
   explanation: string
 }
 
