@@ -12,6 +12,10 @@ Invariants enforced:
      claim_text=null and carry a location_note instead.
   4. Every finding has a non-empty location_note.
   5. Fixtures named *compliant* have zero expected findings.
+  6. expected_claim_type is one of the 9 legal-entity ClaimType values or null
+     (absence-type findings anchor to no claim).
+  7. expected_rule_ids is a non-empty list of canonical rulebook v2026.08.3
+     rule_ids matching the rule-id pattern.
 
 Exit code 0 = all pass; 1 = any mismatch.
 """
@@ -24,6 +28,25 @@ import re
 import sys
 
 FX = pathlib.Path(__file__).parent
+
+# Mirrors backend/contracts.py ClaimType (legal-entity taxonomy, amended
+# 2026-08-29 on agent2/rulebook). Kept inline so this validator stays
+# stdlib-only and runnable without the backend venv.
+CLAIM_TYPES = {
+    "triggering_term",
+    "rate_or_apr",
+    "promotional_or_introductory",
+    "fixed_rate_representation",
+    "approval_or_prequalification",
+    "fee_or_cost",
+    "endorsement_or_testimonial",
+    "government_affiliation",
+    "general_udaap_representation",
+}
+
+# Observed canonical forms: PL-TRIG-001, PL-STATE-CAP-001, CC-PRESCREEN-001,
+# MTG-TI-001, XP-UDAAP-001-personal_loan (cross-product expansion suffix).
+RULE_ID_RE = re.compile(r"^(PL|CC|MTG|XP)-[A-Z]+(-[A-Z]+)*-\d{3}(-[a-z_]+)?$")
 
 
 def normalized_text(raw_html: str) -> str:
@@ -64,6 +87,17 @@ def main() -> int:
             label = f"{f}[{i}] {exp['rule_area']}"
             if not exp.get("location_note", "").strip():
                 errors.append(f"{label}: missing location_note")
+            if "expected_claim_type" not in exp:
+                errors.append(f"{label}: missing expected_claim_type")
+            elif exp["expected_claim_type"] is not None and exp["expected_claim_type"] not in CLAIM_TYPES:
+                errors.append(f"{label}: invalid expected_claim_type '{exp['expected_claim_type']}'")
+            rids = exp.get("expected_rule_ids")
+            if not isinstance(rids, list) or not rids:
+                errors.append(f"{label}: expected_rule_ids missing or empty")
+            else:
+                for rid in rids:
+                    if not isinstance(rid, str) or not RULE_ID_RE.match(rid):
+                        errors.append(f"{label}: malformed rule_id '{rid}'")
             ct = exp["claim_text"]
             if ct is None:
                 continue
