@@ -2,7 +2,13 @@
 
 Machine-actionable compliance rules for the ClearPath marketing-compliance engine.
 Every entry conforms to `RulebookEntry` in `backend/contracts.py` and carries a real
-`citation_url` (eCFR/CFPB/FTC or state source) plus a plain-language `explanation`.
+`citation_url` (eCFR/CFPB/FTC/Cornell or state source) plus a plain-language `explanation`.
+
+Rule `claim_types` use the **legal-entity taxonomy** (ClaimType enum, amended
+2026-08-29): triggering_term, rate_or_apr, promotional_or_introductory,
+fixed_rate_representation, approval_or_prequalification, fee_or_cost,
+endorsement_or_testimonial, government_affiliation, general_udaap_representation.
+`claim_types_legal_map.json` is the definition document for the enum, kept 1:1 with it.
 
 ## Structure
 
@@ -13,31 +19,72 @@ Every entry conforms to `RulebookEntry` in `backend/contracts.py` and carries a 
 | `credit_card.json` | Reg Z open-end (12 CFR 1026.16, 1026.60): negative-claim triggers, intro-rate adjacency/proximity, deferred interest, "fixed", Schumer box, FCRA prescreen format |
 | `mortgage_prequal.json` | Reg N (12 CFR 1014.3) prohibitions, Reg Z mortgage provisions, NMLS display, taxes-&-insurance, staleness |
 | `cross_product.json` | UDAAP lexicon, "prequalified" qualifiers, substantiation, urgency, endorsements, soft-pull claims — expanded per product (see below) |
+| `claim_types_legal_map.json` | ClaimType enum definition doc: every value → legal anchor (honest about doctrine-vs-statute) |
+| `data/lexicons.json` | Shared phrase lists (referenced via `@lexicons.<key>`) |
+| `data/patterns.json` | Shared regex sets (referenced via `@patterns.<key>`) |
+| `data/state_apr_caps.json` | State APR cap table (referenced via `@state_apr_caps.<key>`) |
 
 **Cross-product expansion:** `RulebookEntry.product` is single-valued, so each
 cross-product concept is expanded into three concrete entries with rule_ids of the
 form `XP-<FAMILY>-<NNN>-<product>`. Treat entries sharing a family prefix as one
 conceptual rule for display/dedup purposes.
 
-## How the engine consumes this
+Each product file ends with a `citation_index`: the unique citation URLs used in that
+file (validated against actual usage).
 
-**Deterministic checker (check_kind = `deterministic`)** executes `parameters` directly:
+## Deterministic primitives — the Stage-4 checker implementation spec
 
-- `prohibited_phrases` / `flag_phrases` + `match` — lexicon scans over extracted claim/disclosure text (`case_insensitive_substring` or `case_insensitive_regex` per the `match` field).
-- `conditional_phrases` — each `{phrase, condition_field, violates_when}` is evaluated against the referenced offer cell(s): the phrase violates only when the offer field equals `violates_when` (e.g. "no fees" violates when `fee_deducted_from_proceeds=true`; "pre-approved" violates when `is_firm_offer=false`).
-- `trigger_patterns` + `required_disclosure_types` / `required_elements` — if any pattern matches an extracted claim, the listed `DisclosureType`s must be present among extracted disclosures (adjacency/prominence expectations are named in the parameters and checked against `Disclosure.location`/`prominence`).
-- `matrix_checks` — named reconciliations against the referenced offer-matrix cells at their current version (rate/amount/term within range, intro terms equal, effective window contains today).
-- `state_apr_caps` — advertised APR max vs. cap for every targeted state.
-- `applies_to_surfaces` / `applies_when` — rule gating by submission surface or offer flags.
+Every deterministic rule's `parameters` carries exactly:
 
-**LLM judge (check_kind = `llm_judged`)** receives `parameters.judge_focus` and the
-`explanation` as prompt context for the submission's product, and emits `Finding`s with
-`check_class="judgment"`; `detect_patterns`, where present, help the judge locate the
-relevant claim but are not enforced deterministically.
+1. **`check_type`** — one of the CLOSED vocabulary below (undeclared/malformed fails validation);
+2. **`check_description`** — one plain-English sentence saying what the check verifies (required, for non-engineers);
+3. **minimal readable parameters** — small inline values, or **named data references**: any list/dict-valued field may be the string `"@<file>.<key>"`, resolved against `data/lexicons.json`, `data/patterns.json`, or `data/state_apr_caps.json`. A dangling reference fails validation. Bulky data (phrase lists, regex sets, the cap table) lives ONLY in `data/`.
 
-Findings produced from a rule inherit its `severity` and `citation_url`. Overlapping
-hits (e.g. `XP-UDAAP-001-mortgage_prequal` vs `MTG-REGN-001`) should be deduped by
-(claim, phrase), keeping the highest-severity rule.
+`note` is the only other key permitted — human context, never executed.
+
+| check_type | Schema (required → optional) | Executor semantics |
+|---|---|---|
+| `phrase_prohibited` | `phrases`, `match` | If any phrase matches extracted claim/disclosure text (per `match`: `case_insensitive_substring` or `case_insensitive_regex`), emit a finding. Flat ban. |
+| `phrase_conditional` | `phrases`, `condition_field`, `violates_when` → `required_qualifier` | If a phrase matches (case-insensitive substring), resolve `condition_field` against the referenced offer cell or verification input; a violation exists when its value equals `violates_when`. `required_qualifier` names the cure whose proximate presence downgrades/clears the finding. |
+| `trigger_requires_disclosures` | `trigger_patterns`, `required_disclosure_types` | If any pattern (case-insensitive regex; plain words act as substrings) matches an extracted claim, every listed `DisclosureType` must be present among extracted disclosures. Missing ones are findings. |
+| `element_required` | `element` → `applies_when`, `detection_ref` | The named element/DisclosureType must be present in the artifact (`detection_ref` supplies detection regexes). `applies_when` gates the rule (variants below); absent = always applies. |
+| `proximity_required` | `anchor_patterns`, `companion_patterns`, `requirement` | For every anchor match, at least one companion must satisfy the stated proximity/prominence `requirement` (evaluated against `Claim.location` / `Disclosure.location`+`prominence`). Anchor with no compliant companion = finding. |
+| `ground_truth_consistency` | `claim_field`, `matrix_field`, `comparator` | Reconcile one extracted-claim field against the referenced offer-matrix field. `matrix_field` may be a `lo..hi` span. Comparators: `within_range`, `equals`, `exists_in`, `disjoint_from`, `not_conflated`. |
+| `numeric_cap_by_state` | `caps_table`, `compare` | For every targeted state present in the caps table, the advertised APR max must not exceed `apr_cap` (entries may carry `all_in`/`scope` qualifiers). |
+| `composite_all` | `checks` | **Structural addition — the one primitive added beyond the mandated seven (documented here prominently).** Every item in `checks` is itself a primitive block (no nested `composite_all`); ALL must pass. Used where one rule atomically bundles reconciliations (truthfulness suites) or paired requirements (deferred interest: proximity + retroactive disclosure). `check_description` is required at the rule level, optional on sub-checks. |
+
+Additional conventions:
+
+- `applies_when` variants: `{"offer_field": F, "equals": V}` (gate on the referenced offer cell), `{"surface_in": [...]}` (gate on `Submission.surface`), `{"any_anchor_matched": true}` (inside `composite_all`: gate on a sibling proximity check's anchors having matched).
+- **Verification-input condition fields:** some `condition_field` values are not `OfferCell` columns (`soft_pull_verified`, `government_program_verified`, `effective_end_supports_urgency`). The checker resolves them from integration config / derives them from the matrix as described in each rule's `note`; an unresolvable condition emits a needs-verification finding rather than passing silently.
+- Findings inherit the rule's `severity` and `citation_url`. Overlapping hits (e.g. `XP-UDAAP-001-mortgage_prequal` vs `MTG-REGN-001`) dedupe by (claim, phrase), keeping the highest-severity rule.
+
+**LLM judge (check_kind = `llm_judged`)** rules carry: `judge_focus` (the question),
+`violation_examples` (2-3 creative sentences that fail), `compliant_contrast` (one that
+passes), and `citation_quote` — a verbatim quote fetched from the cited authority page
+(`null` where the page was unfetchable at authoring time, never invented — see the
+rule's `note`). The judge receives all four plus `explanation` as prompt context and
+emits `Finding`s with `check_class="judgment"`; `detect_patterns`, where present, help
+locate the relevant claim but are not enforced deterministically.
+
+## Severity rubric
+
+Severity is **editorial** — the law assigns no severities itself. Assignments are
+anchored to this rubric:
+
+- **critical** — flat prohibition or truth defect with direct enforcement precedent:
+  false "pre-approved" (FTC v. Credit Karma, $3M, 2023), stale/unavailable advertised
+  rates on partner surfaces (CFPB v. Amerisave, $19.3M, 2014), "fixed" on variable
+  mortgage rates and government-affiliation implications (CFPB's 2020 VA-advertising
+  sweep, 8-9 consent orders), deferred-interest and prescreen-notice defects, state
+  rate-cap violations (loans void in IL).
+- **high** — an explicitly mandated element is missing or misplaced: trigger-term
+  companion disclosures, "intro" adjacency, Schumer box, NMLS ID, taxes-&-insurance,
+  prequalified-without-qualifier.
+- **medium** — qualifier/prominence/verification defects: urgency devices, soft-pull
+  claims pending verification, net-impression concerns, testimonial disclosure quality.
+- **low / info** — advisory; style and best-practice flags (none currently emitted by
+  this rulebook version).
 
 ## Versioning
 
@@ -51,7 +98,11 @@ sweeps and the audit trail can attribute findings to the exact rule set in force
 python rulebook/validate_rulebook.py
 ```
 
-Validates every entry against the pydantic model, checks for duplicate rule_ids and
-non-URL citations, and reconciles manifest counts against actuals. Non-zero exit on any
-failure. Note: state APR cap values are simplified for demo purposes (loan-size and
-licensee carve-outs not modeled); see `PL-STATE-CAP-001.parameters.values_note`.
+Validates every entry against the pydantic model; enforces the closed `check_type`
+vocabulary and per-primitive schemas (with `@` data-ref resolution — dangling refs
+fail); requires `check_description` on every deterministic rule; enforces the
+llm_judged enrichment contract; checks duplicate rule_ids, non-URL citations, per-file
+`citation_index` accuracy, manifest-vs-actual counts, and 1:1 alignment of
+`claim_types_legal_map.json` with the ClaimType enum. Non-zero exit on any failure.
+Note: state APR cap values are simplified for demo purposes (loan-size and licensee
+carve-outs not modeled); see `data/state_apr_caps.json`.

@@ -27,15 +27,22 @@ class Product(str, Enum):
 
 
 class ClaimType(str, Enum):
-    RATE = "rate"                # APR / interest-rate mentions
-    PAYMENT = "payment"          # monthly-payment amounts ($509/mo)
-    AMOUNT = "amount"            # loan/credit amounts (up to $50,000)
-    APPROVAL = "approval"        # pre-approved / prequalified / approval odds
-    FEE = "fee"                  # fee claims (no hidden fees, $0 annual fee)
-    URGENCY = "urgency"          # limited-time / act-now devices
-    COMPARISON = "comparison"    # lowest/best-rate comparative claims
-    TESTIMONIAL = "testimonial"  # endorsements / testimonials
-    OTHER = "other"
+    """Legal-entity taxonomy: each value names the body of law that governs the claim.
+
+    A text span embodying two legal categories yields two Claim objects (extractor
+    convention — no multi-label claims). Anchors documented in CONTRACTS.md and
+    rulebook/claim_types_legal_map.json.
+    """
+
+    TRIGGERING_TERM = "triggering_term"                          # Reg Z 1026.24(d) / 1026.16(b)
+    RATE_OR_APR = "rate_or_apr"                                  # Reg Z 1026.24(b)-(c)
+    PROMOTIONAL_OR_INTRODUCTORY = "promotional_or_introductory"  # Reg Z 1026.16(g)-(h)
+    FIXED_RATE_REPRESENTATION = "fixed_rate_representation"      # Reg Z 1026.16(f); Reg N 1014.3
+    APPROVAL_OR_PREQUALIFICATION = "approval_or_prequalification"  # FCRA 603(l); Reg N 1014.3(q)
+    FEE_OR_COST = "fee_or_cost"                                  # TILA 1026.4; Reg N 1014.3(c)
+    ENDORSEMENT_OR_TESTIMONIAL = "endorsement_or_testimonial"    # 16 CFR 255.0
+    GOVERNMENT_AFFILIATION = "government_affiliation"            # Reg N 1014.3(n)
+    GENERAL_UDAAP_REPRESENTATION = "general_udaap_representation"  # FTC Act §5; CFPA §1031 (residual)
 
 
 class DisclosureType(str, Enum):

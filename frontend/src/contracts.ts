@@ -5,16 +5,21 @@
 
 export type Product = 'personal_loan' | 'credit_card' | 'mortgage_prequal'
 
+/**
+ * Legal-entity taxonomy: each value names the body of law governing the claim.
+ * A text span embodying two legal categories yields two Claim objects
+ * (extractor convention — no multi-label claims). See CONTRACTS.md.
+ */
 export type ClaimType =
-  | 'rate'
-  | 'payment'
-  | 'amount'
-  | 'approval'
-  | 'fee'
-  | 'urgency'
-  | 'comparison'
-  | 'testimonial'
-  | 'other'
+  | 'triggering_term' // Reg Z 1026.24(d) / 1026.16(b)
+  | 'rate_or_apr' // Reg Z 1026.24(b)-(c)
+  | 'promotional_or_introductory' // Reg Z 1026.16(g)-(h)
+  | 'fixed_rate_representation' // Reg Z 1026.16(f); Reg N 1014.3
+  | 'approval_or_prequalification' // FCRA 603(l); Reg N 1014.3(q)
+  | 'fee_or_cost' // TILA 1026.4; Reg N 1014.3(c)
+  | 'endorsement_or_testimonial' // 16 CFR 255.0
+  | 'government_affiliation' // Reg N 1014.3(n)
+  | 'general_udaap_representation' // FTC Act §5; CFPA §1031 (residual)
 
 export type DisclosureType =
   | 'apr_qualifier'

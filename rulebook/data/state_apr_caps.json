@@ -1,0 +1,29 @@
+{
+  "_description": "State APR cap table for consumer loans. Referenced via '@state_apr_caps.us_consumer_loan_caps'. Values simplified for demo purposes from NCLC-style surveys; loan-size and licensee carve-outs not modeled.",
+  "us_consumer_loan_caps": {
+    "AR": {"apr_cap": 17.0, "all_in": false},
+    "AZ": {"apr_cap": 36.0, "all_in": false},
+    "CA": {"apr_cap": 36.0, "all_in": false, "scope": "loans $2,500-$10,000 (CFL/AB 539)"},
+    "CO": {"apr_cap": 36.0, "all_in": false},
+    "CT": {"apr_cap": 36.0, "all_in": false},
+    "DC": {"apr_cap": 24.0, "all_in": false},
+    "GA": {"apr_cap": 36.0, "all_in": false},
+    "HI": {"apr_cap": 36.0, "all_in": false},
+    "IL": {"apr_cap": 36.0, "all_in": true, "scope": "PLPA all-in MAPR; loans above cap are void"},
+    "MA": {"apr_cap": 23.0, "all_in": false},
+    "MD": {"apr_cap": 33.0, "all_in": false},
+    "ME": {"apr_cap": 30.0, "all_in": false},
+    "MT": {"apr_cap": 36.0, "all_in": false},
+    "NC": {"apr_cap": 30.0, "all_in": false},
+    "NE": {"apr_cap": 29.0, "all_in": false},
+    "NH": {"apr_cap": 36.0, "all_in": false},
+    "NJ": {"apr_cap": 30.0, "all_in": false},
+    "NM": {"apr_cap": 36.0, "all_in": true},
+    "NY": {"apr_cap": 25.0, "all_in": false, "scope": "criminal usury ceiling"},
+    "OR": {"apr_cap": 36.0, "all_in": false},
+    "SD": {"apr_cap": 36.0, "all_in": false, "scope": "licensed-lender carve-outs exist"},
+    "VA": {"apr_cap": 36.0, "all_in": false},
+    "VT": {"apr_cap": 24.0, "all_in": false},
+    "WV": {"apr_cap": 31.0, "all_in": false}
+  }
+}

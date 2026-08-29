@@ -5,20 +5,14 @@
     {
       "rule_id": "CC-TRIG-001",
       "product": "credit_card",
-      "claim_types": ["fee", "rate", "other"],
+      "claim_types": ["triggering_term", "fee_or_cost"],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
-        "trigger_patterns": [
-          "no annual fee",
-          "\\$0 annual fee",
-          "low(er)? interest",
-          "no interest",
-          "\\b\\d{1,2}(\\.\\d{1,2})?\\s?% (intro )?APR"
-        ],
-        "match": "case_insensitive_regex",
-        "required_disclosure_types": ["trigger_disclosure"],
-        "required_elements": ["periodic_rate_as_apr", "variable_rate_fact_if_variable", "membership_or_participation_fees"]
+        "check_type": "trigger_requires_disclosures",
+        "check_description": "When a card ad states a rate or fee claim — including negative claims like 'no annual fee' — the Reg Z open-end companion disclosures must be present.",
+        "trigger_patterns": "@patterns.triggering_terms_open_end",
+        "required_disclosure_types": ["trigger_disclosure"]
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
       "explanation": "Reg Z 12 CFR 1026.16(b): open-end trigger terms include NEGATIVE claims — 'no annual fee' triggers disclosure of any finance charge/periodic rate (stated as APR, with its variable nature) and other fees. Cards ads triggering must carry the companion disclosures."
@@ -26,14 +20,15 @@
     {
       "rule_id": "CC-INTRO-001",
       "product": "credit_card",
-      "claim_types": ["rate"],
+      "claim_types": ["promotional_or_introductory"],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
-        "promo_rate_patterns": ["0\\s?%", "\\b\\d{1,2}(\\.\\d{1,2})?\\s?%\\s?(intro|introductory|promo)"],
-        "match": "case_insensitive_regex",
-        "required_disclosure_types": ["intro_adjacency"],
-        "adjacency": "the word 'intro' or 'introductory' must appear in immediate proximity to EVERY listing of the promotional rate"
+        "check_type": "proximity_required",
+        "check_description": "The word 'intro' or 'introductory' must sit immediately next to every appearance of a promotional rate.",
+        "anchor_patterns": "@patterns.promo_rate",
+        "companion_patterns": "@patterns.intro_words",
+        "requirement": "Companion in immediate proximity to EVERY listing of the promotional rate (maps to DisclosureType.intro_adjacency)."
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
       "explanation": "Reg Z 12 CFR 1026.16(g)(3): a promotional rate must be identified as 'introductory'/'intro' in immediate proximity to each listing of the rate. This is a layout/proximity requirement, not merely a presence requirement."
@@ -41,14 +36,15 @@
     {
       "rule_id": "CC-INTRO-002",
       "product": "credit_card",
-      "claim_types": ["rate"],
+      "claim_types": ["promotional_or_introductory"],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
-        "promo_rate_patterns": ["0\\s?%", "intro(ductory)?\\s?(APR|rate)"],
-        "match": "case_insensitive_regex",
-        "required_elements": ["promo_end_date_or_period", "post_promo_apr_or_range"],
-        "proximity": "closely proximate to the FIRST listing of the promotional rate"
+        "check_type": "proximity_required",
+        "check_description": "The promo end date and the rate that applies afterwards must appear close to the first mention of the promotional rate.",
+        "anchor_patterns": "@patterns.promo_rate_mentions",
+        "companion_patterns": "@patterns.promo_end_and_post_rate",
+        "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate."
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
       "explanation": "Reg Z 12 CFR 1026.16(g)(4): ads stating a promotional rate must state when it ends and the post-promotional APR (or range, if creditworthiness-dependent), closely proximate to the first listing."
@@ -56,13 +52,25 @@
     {
       "rule_id": "CC-DEFER-001",
       "product": "credit_card",
-      "claim_types": ["rate", "fee"],
+      "claim_types": ["promotional_or_introductory"],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
-        "deferred_interest_patterns": ["no interest if", "no interest for", "interest[- ]free", "0% interest for"],
-        "match": "case_insensitive_substring",
-        "required_elements": ["if_paid_in_full_immediate_proximity", "retroactive_accrual_disclosure"]
+        "check_type": "composite_all",
+        "check_description": "A deferred-interest offer must say 'if paid in full' immediately next to each 'no interest' statement and disclose that interest is charged retroactively from the purchase date if the balance is not paid off in time.",
+        "checks": [
+          {
+            "check_type": "proximity_required",
+            "anchor_patterns": "@patterns.deferred_interest",
+            "companion_patterns": "@patterns.if_paid_in_full",
+            "requirement": "'if paid in full' in immediate proximity to EACH deferred-interest statement"
+          },
+          {
+            "check_type": "element_required",
+            "element": "retroactive_accrual_disclosure",
+            "applies_when": {"any_anchor_matched": true}
+          }
+        ]
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
       "explanation": "Reg Z 12 CFR 1026.16(h): deferred-interest offers must carry 'if paid in full' in immediate proximity to each 'no interest' statement, plus disclosure that interest accrues from the purchase date and is charged retroactively if the balance is not paid in full by the deadline."
@@ -70,15 +78,16 @@
     {
       "rule_id": "CC-FIXED-001",
       "product": "credit_card",
-      "claim_types": ["rate"],
+      "claim_types": ["fixed_rate_representation"],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
-        "conditional_phrases": [
-          {"phrase": "fixed", "condition_field": "apr_type", "violates_when": "variable"}
-        ],
-        "match": "case_insensitive_substring",
-        "cure": "state the period during which the rate is fixed, or only use for rates that cannot increase"
+        "check_type": "phrase_conditional",
+        "check_description": "'Fixed' may not describe a card rate whose referenced offer is variable, unless a fixed period is stated.",
+        "phrases": "@lexicons.fixed_terms",
+        "condition_field": "apr_type",
+        "violates_when": "variable",
+        "required_qualifier": "state the period during which the rate is fixed, or only use for rates that cannot increase"
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
       "explanation": "Reg Z 12 CFR 1026.16(f): 'fixed' may describe an open-end rate only if a period is specified during which it will not change or if it truly cannot increase. Calling a variable-APR card rate 'fixed' is a violation."
@@ -86,12 +95,14 @@
     {
       "rule_id": "CC-SCHUMER-001",
       "product": "credit_card",
-      "claim_types": ["other"],
+      "claim_types": ["rate_or_apr", "fee_or_cost"],
       "check_kind": "deterministic",
       "severity": "high",
       "parameters": {
-        "applies_to_surfaces": ["prescreen_email", "direct_mail", "solicitation"],
-        "required_disclosure_types": ["schumer_box_link"]
+        "check_type": "element_required",
+        "check_description": "Card solicitations (direct mail and email) must present or unavoidably link the standardized Schumer box rate/fee table.",
+        "element": "schumer_box_link",
+        "applies_when": {"surface_in": ["prescreen_email", "direct_mail", "solicitation"]}
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/60/",
       "explanation": "Reg Z 12 CFR 1026.60: card applications and solicitations (direct mail and electronic) must present the standardized rate/fee table (Schumer box) or, for electronic solicitations, an unavoidable link/reference to it."
@@ -99,16 +110,15 @@
     {
       "rule_id": "CC-PRESCREEN-001",
       "product": "credit_card",
-      "claim_types": ["approval", "other"],
+      "claim_types": ["approval_or_prequalification"],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
+        "check_type": "element_required",
+        "check_description": "A prescreened firm-offer creative must carry the FCRA opt-out notices in their mandated form and placement.",
+        "element": "opt_out_notice",
         "applies_when": {"offer_field": "is_firm_offer", "equals": true},
-        "required_disclosure_types": ["opt_out_notice"],
-        "format_requirements": {
-          "short_notice": "front/first page, larger than principal text, >=12pt, set off by border, states opt-out right + 1-888-5-OPTOUT, points to long notice",
-          "long_notice": ">=8pt, heading 'PRESCREEN & OPT-OUT NOTICE' in capitals"
-        }
+        "note": "Format expectations for reviewers: short notice on front/first page, larger than principal text, >=12pt, bordered, states opt-out right + 1-888-5-OPTOUT, points to long notice; long notice >=8pt with 'PRESCREEN & OPT-OUT NOTICE' heading in capitals."
       },
       "citation_url": "https://www.law.cornell.edu/cfr/text/12/1022.54",
       "explanation": "FCRA 15 USC 1681m(d) + 12 CFR 1022.54: prescreened firm offers must carry the short-form opt-out notice (page one, >=12pt, bordered) and the long-form notice with all statutory elements. Missing or malformed notices on a firm-offer creative are per-se violations."
@@ -116,16 +126,16 @@
     {
       "rule_id": "CC-BADGE-001",
       "product": "credit_card",
-      "claim_types": ["approval"],
+      "claim_types": ["approval_or_prequalification"],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
-        "conditional_phrases": [
-          {"phrase": "pre-approved", "condition_field": "is_firm_offer", "violates_when": false},
-          {"phrase": "preapproved", "condition_field": "is_firm_offer", "violates_when": false}
-        ],
-        "match": "case_insensitive_substring",
-        "also_check": "submission.badge_text vs offer.badge_designation_allowed"
+        "check_type": "phrase_conditional",
+        "check_description": "'Pre-approved' may appear only when the referenced card offer is a true FCRA firm offer of credit.",
+        "phrases": "@lexicons.preapproved_terms",
+        "condition_field": "is_firm_offer",
+        "violates_when": false,
+        "note": "Checker should also reconcile submission.badge_text against offer.badge_designation_allowed."
       },
       "citation_url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
       "explanation": "'Pre-approved' for a card requires a true FCRA firm offer (is_firm_offer=true on the referenced offer cell). Marketplace prequal placements (odds-model matches) must use 'prequalified'. FTC v. Credit Karma is the controlling precedent."
@@ -133,16 +143,18 @@
     {
       "rule_id": "CC-TRUTH-001",
       "product": "credit_card",
-      "claim_types": ["rate", "fee"],
+      "claim_types": ["rate_or_apr", "promotional_or_introductory", "fee_or_cost"],
       "check_kind": "deterministic",
       "severity": "critical",
       "parameters": {
-        "matrix_checks": [
-          "claimed_intro_apr_equals_matrix_intro_apr",
-          "claimed_intro_period_equals_matrix_intro_period",
-          "claimed_post_promo_range_within_matrix_apr_range",
-          "claimed_annual_fee_equals_matrix_annual_fee",
-          "offer_effective_window_contains_today"
+        "check_type": "composite_all",
+        "check_description": "Every advertised card number — intro APR, intro period, post-promo range, annual fee — must match the referenced offer-matrix cells at their current, unexpired version.",
+        "checks": [
+          {"check_type": "ground_truth_consistency", "claim_field": "intro_apr_value", "matrix_field": "intro_apr_pct", "comparator": "equals"},
+          {"check_type": "ground_truth_consistency", "claim_field": "intro_period_value", "matrix_field": "intro_period_months", "comparator": "equals"},
+          {"check_type": "ground_truth_consistency", "claim_field": "post_promo_apr_range", "matrix_field": "apr_min..apr_max", "comparator": "within_range"},
+          {"check_type": "ground_truth_consistency", "claim_field": "annual_fee_value", "matrix_field": "annual_fee", "comparator": "equals"},
+          {"check_type": "ground_truth_consistency", "claim_field": "review_date", "matrix_field": "effective_start..effective_end", "comparator": "within_range"}
         ]
       },
       "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
@@ -151,14 +163,28 @@
     {
       "rule_id": "CC-JUDGE-001",
       "product": "credit_card",
-      "claim_types": ["other", "comparison"],
+      "claim_types": ["general_udaap_representation"],
       "check_kind": "llm_judged",
       "severity": "medium",
       "parameters": {
-        "judge_focus": "Rewards/benefit claims ('unlimited cash back', 'best travel card'): are earn rates, caps, and redemption limits disclosed or contradicted? Are comparative/superlative claims substantiated or puffery crossing into measurable-claim territory?"
+        "judge_focus": "Rewards/benefit claims ('unlimited cash back', 'best travel card'): are earn rates, caps, and redemption limits disclosed or contradicted? Are comparative/superlative claims substantiated or puffery crossing into measurable-claim territory?",
+        "violation_examples": [
+          "Earn UNLIMITED 5% cash back on everything! (fine print: 5% only on rotating categories capped at $1,500/quarter; 1% elsewhere)",
+          "The best travel card in America — period. (no substantiation basis; measurable superlative)",
+          "$500 welcome bonus, no strings attached (fine print: requires $4,000 spend in 3 months)"
+        ],
+        "compliant_contrast": "Earn 1.5% unlimited cash back on every purchase. New cardmembers: $200 bonus after spending $1,000 in the first 3 months.",
+        "citation_quote": "Likewise, oral or fine print disclosures or contract disclosures may be insufficient to cure a misleading headline or a prominent written representation."
       },
-      "citation_url": "https://www.ftc.gov/system/files/documents/public_statements/410531/831014deceptionstmt.pdf",
+      "citation_url": "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf",
       "explanation": "Rewards and superlative card claims are judged on net impression and substantiation; undisclosed caps or redemption restrictions that contradict an 'unlimited' headline are deceptive."
     }
+  ],
+  "citation_index": [
+    "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+    "https://www.consumerfinance.gov/rules-policy/regulations/1026/60/",
+    "https://www.law.cornell.edu/cfr/text/12/1022.54",
+    "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+    "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf"
   ]
 }

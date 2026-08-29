@@ -1,0 +1,36 @@
+{
+  "_description": "Shared regex pattern sets (case-insensitive). Rules reference these via '@patterns.<key>'. Plain-word entries act as substrings.",
+  "triggering_terms_closed_end": [
+    "\\$\\s?[\\d,]+(\\.\\d{2})?\\s?(/|per\\s)?mo(nth)?",
+    "\\b\\d{1,3}\\s(monthly\\s)?payments\\b",
+    "\\b(in|over|for)\\s\\d{1,2}\\s?(months|years)\\b",
+    "\\bdown\\s?payment\\b",
+    "\\bfinance\\scharge\\b"
+  ],
+  "triggering_terms_open_end": [
+    "no annual fee",
+    "\\$0 annual fee",
+    "low(er)? interest",
+    "no interest",
+    "\\b\\d{1,2}(\\.\\d{1,2})?\\s?% (intro )?APR"
+  ],
+  "payment_amount": [
+    "\\$\\s?[\\d,]+(\\.\\d{2})?\\s?(/|per\\s)?mo(nth)?",
+    "monthly (P&I )?payment"
+  ],
+  "rate_percentage": ["\\b\\d{1,2}(\\.\\d{1,3})?\\s?%"],
+  "apr_label": ["\\bAPR\\b", "annual percentage rate"],
+  "aslowas_floor": ["as low as", "rates? from", "starting at"],
+  "promo_rate": ["0\\s?%", "\\b\\d{1,2}(\\.\\d{1,2})?\\s?%\\s?(promo|promotional)?\\s?APR"],
+  "promo_rate_mentions": ["0\\s?%", "intro(ductory)?\\s?(APR|rate)"],
+  "intro_words": ["\\bintro\\b", "\\bintroductory\\b"],
+  "promo_end_and_post_rate": [
+    "(for|until|through|ends)\\s?\\d{1,2}\\s?(months|billing cycles)",
+    "(then|after that|after the intro period)[^.]{0,40}\\d{1,2}(\\.\\d{1,2})?\\s?%",
+    "variable APR"
+  ],
+  "deferred_interest": ["no interest (if|for)", "interest[- ]free", "0% interest for"],
+  "if_paid_in_full": ["if paid in full"],
+  "prequalified_terms": ["prequalified", "pre-qualified"],
+  "nmls_id": ["NMLS\\s?#?\\s?\\d{4,}"]
+}

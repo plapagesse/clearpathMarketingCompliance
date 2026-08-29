@@ -1,0 +1,50 @@
+{
+  "description": "Definition document for the ClaimType enum in backend/contracts.py — kept 1:1 with it. Each value is a LEGAL-ENTITY category: it names the body of law that governs the claim. Extractor convention: a text span embodying two legal categories yields two Claim objects (no multi-label). Honest about doctrine-vs-statute where no statutory definition exists.",
+  "claim_types": {
+    "triggering_term": {
+      "legal_concept": "Reg Z 'triggering terms' — payment amounts, number of payments, repayment periods, downpayments, finance-charge amounts (closed-end) and their open-end analogues incl. negative claims — whose presence obligates companion disclosures",
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "note": "12 CFR 1026.24(d) (closed-end) / 1026.16(b) (open-end). Statutorily defined trigger mechanics."
+    },
+    "rate_or_apr": {
+      "legal_concept": "Rate representations: advertised rates must be stated and labeled as an annual percentage rate, with prominence rules for simple rates",
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+      "note": "12 CFR 1026.24(b)-(c); mortgage presentation also 1026.24(f); open-end analogues in 1026.16."
+    },
+    "promotional_or_introductory": {
+      "legal_concept": "Promotional/introductory rate and deferred-interest representations, with adjacency and proximity requirements",
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "note": "12 CFR 1026.16(g) (promotional rates) and 1026.16(h) (deferred interest)."
+    },
+    "fixed_rate_representation": {
+      "legal_concept": "'Fixed' rate representations — permitted only for rates that genuinely cannot increase (or with a stated fixed period); banned for variable/adjustable products",
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/",
+      "note": "12 CFR 1026.16(f) (open-end); Reg N 12 CFR 1014.3 and Reg Z 1026.24(i)(1) (mortgage)."
+    },
+    "approval_or_prequalification": {
+      "legal_concept": "Approval and likelihood-of-approval representations: 'pre-approved' gated by the FCRA firm offer of credit; mortgage approval-likelihood misrepresentation banned by Reg N",
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "note": "FCRA 603(l), 15 USC 1681a(l) (firm offer definition); Reg N 12 CFR 1014.3(q). 'Prequalified' has no statutory definition — its boundaries are enforcement doctrine (FTC v. Credit Karma)."
+    },
+    "fee_or_cost": {
+      "legal_concept": "Fee and cost-of-credit representations against the TILA finance-charge concept; 'no fees' claims judged under deception doctrine",
+      "citation_url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/4/",
+      "note": "TILA/Reg Z 12 CFR 1026.4 (finance charge); Reg N 12 CFR 1014.3(c) (mortgage fee/cost misrepresentation). 'No hidden fees' style claims have no statutory test — anchor is UDAAP/FTC Section 5 net impression."
+    },
+    "endorsement_or_testimonial": {
+      "legal_concept": "Endorsements and testimonials: honest-opinion requirement, material-connection disclosure, generally-achievable results",
+      "citation_url": "https://www.law.cornell.edu/cfr/text/16/255.0",
+      "note": "16 CFR 255.0 (definitions), 255.1 (advertiser liability/monitoring), 255.5 (material connections). FTC guides interpreting Section 5 — doctrine formalized as guidance, not standalone statute."
+    },
+    "government_affiliation": {
+      "legal_concept": "Representations of government provision, endorsement, or affiliation in mortgage marketing",
+      "citation_url": "https://www.law.cornell.edu/cfr/text/12/1014.3",
+      "note": "Reg N 12 CFR 1014.3(n). Outside mortgage, government-affiliation implications fall to general deception doctrine."
+    },
+    "general_udaap_representation": {
+      "legal_concept": "Residual category: any other representation reachable as a deceptive act or practice — urgency devices, comparative/superlative claims, debt-free/savings claims",
+      "citation_url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+      "note": "No statutory definition by design — FTC Act Section 5 and CFPA Section 1031 supply the standard (misleads or likely to mislead; reasonable interpretation; material). Urgency and comparison claims specifically have no statutory test; their treatment is deception doctrine."
+    }
+  }
+}

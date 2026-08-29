@@ -1,11 +1,16 @@
 {
-  "rulebook_version": "2026.08.0",
+  "rulebook_version": "2026.08.1",
   "generated": "2026-08-29",
   "rule_files": [
     "personal_loan.json",
     "credit_card.json",
     "mortgage_prequal.json",
     "cross_product.json"
+  ],
+  "data_files": [
+    "data/lexicons.json",
+    "data/patterns.json",
+    "data/state_apr_caps.json"
   ],
   "counts": {
     "total": 51,
@@ -17,10 +22,22 @@
     "by_check_kind": {
       "deterministic": 38,
       "llm_judged": 13
+    },
+    "by_check_type": {
+      "trigger_requires_disclosures": 7,
+      "proximity_required": 4,
+      "composite_all": 4,
+      "numeric_cap_by_state": 1,
+      "ground_truth_consistency": 1,
+      "phrase_conditional": 12,
+      "phrase_prohibited": 6,
+      "element_required": 3
     }
   },
   "conventions": {
+    "claim_types": "legal-entity taxonomy per backend/contracts.py ClaimType (amended 2026-08-29); claim_types_legal_map.json is the definition doc, kept 1:1",
     "cross_product_expansion": "RulebookEntry.product is single-valued; cross-product rules are expanded per product with rule_id family prefix XP-<FAMILY>-<NNN>-<product>",
+    "data_refs": "bulky data lives in data/*.json; rules reference it via '@<file>.<key>' strings (validated)",
     "versioning": "rulebook_version = YYYY.MM.patch; bump patch for rule edits, month for additions; CheckRun.rulebook_version records what each run executed against"
   }
 }
