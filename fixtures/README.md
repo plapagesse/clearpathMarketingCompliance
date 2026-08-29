@@ -4,7 +4,8 @@ Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inlin
 
 - `offer_matrix.csv` — ClearPath's current offer cells (version `2026-08`): the truthfulness baseline for every check.
 - `submissions.csv` — one manifest row per mock (context bundle: product, template, offer cells, states, mode, SLA). Columns match `backend/contracts.py::Submission`.
-- `expected_findings.json` — planted violations per mock, keyed by asset file. **Eval key for the extractor/checker/judge — do not feed to the engine as input.**
+- `expected_findings.json` — planted violations per mock, keyed by asset file. **Eval key for the extractor/checker/judge — do not feed to the engine as input.** Per finding: `claim_text` is strictly literal-or-null — non-null values appear verbatim in the entity-decoded, tag-stripped, comment-stripped, whitespace-collapsed text of the mock; absence/layout findings use `null` and carry the context in `location_note` (present on every finding).
+- `validate_fixtures.py` — enforces the invariants above (coverage, manifest/mode agreement, literal claim_text, location_note presence, compliant-fixture emptiness). Run `python3 fixtures/validate_fixtures.py`; exit 0 = pass.
 - `*.html` — the mocks. HTML is canonical (no PNGs; render in a browser if needed).
 
 ## Inventory
