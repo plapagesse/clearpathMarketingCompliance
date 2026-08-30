@@ -529,7 +529,7 @@ def _phrase_conditional(rule: RulebookEntry, ctx: _Ctx) -> None:
         # registry: one value for the whole submission, never per cell.
         violating = [c.offer_id for c in ctx.cells] if values[0] == violates_when else []
         if values[0] == violates_when and not ctx.cells:
-            violating = ["the referenced offer"]
+            violating = ["none could be matched to this submission"]
     if not violating:
         return
 
