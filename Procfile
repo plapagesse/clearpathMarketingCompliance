@@ -1,1 +1,1 @@
-web: gunicorn --threads 8 backend.app:app
+web: bash deploy/start.sh
