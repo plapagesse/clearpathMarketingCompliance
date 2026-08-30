@@ -5,7 +5,9 @@
   margin: 0 auto;
   padding: 16px;
   font-family: system-ui, sans-serif;
-  color: #222;
+  color: #1a1f24;
+  background: #ffffff;
+  min-height: 100vh;
   text-align: left;
 }
 
@@ -18,9 +20,14 @@
   flex-wrap: wrap;
 }
 
+/* Form controls get explicit colors: left alone they fall back to the OS
+   system palette and go light-on-light. */
 .queue .queue-bar select {
   padding: 4px 6px;
   font-size: 14px;
+  border: 1px solid #c7ccd1;
+  background: #ffffff;
+  color: #1a1f24;
 }
 
 .queue .counter {
@@ -29,7 +36,7 @@
 }
 
 .queue .muted {
-  color: #777;
+  color: #62676d; /* 5.3:1 on white — muted, still readable */
 }
 
 .queue .small {
@@ -123,7 +130,7 @@
   font-size: 14px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #666;
+  color: #62676d;
 }
 
 .queue button {
@@ -131,6 +138,7 @@
   padding: 6px 14px;
   border: 1px solid #999;
   background: #f4f4f4;
+  color: #1a1f24;
   cursor: pointer;
 }
 
@@ -240,13 +248,16 @@
   padding: 0;
   font-size: 12px;
   line-height: 1.7;
+  color: #1a1f24;
 }
 
 .queue .note {
   font: inherit;
   width: 100%;
   padding: 6px;
-  border: 1px solid #ccc;
+  border: 1px solid #c7ccd1;
+  background: #ffffff;
+  color: #1a1f24;
   box-sizing: border-box;
 }
 

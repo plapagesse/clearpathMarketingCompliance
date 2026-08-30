@@ -1,2 +1,20 @@
-:root { color-scheme: light dark; }
-body { margin: 0; }
+/* The app is a light-mode document. The Vite scaffold shipped
+   `color-scheme: light dark`, which handed the whole page over to the OS dark
+   default: near-black background under views that never set their own, and
+   light system colors on native buttons, selects and inputs. Pinning it light
+   here means neither view has to defend itself against that. */
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #1a1f24;
+}
+
+#root {
+  background: #ffffff;
+  min-height: 100vh;
+}
