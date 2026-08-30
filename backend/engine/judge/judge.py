@@ -200,6 +200,31 @@ def _link_claim(evidence_text: str, claims: list[Claim]) -> str | None:
     return None
 
 
+SUMMARY_CHARS = 180
+
+
+def _judgment_summary(verdict, rule) -> str:
+    """One plain-English line a reviewer can act on.
+
+    The judge's own first sentence of reasoning is the best available summary
+    of THIS finding — it describes the creative, not the rule. It is prefixed
+    so the reviewer can see at a glance that a model made a judgment call here
+    rather than a rule matching a pattern, and trimmed so the queue's 200-char
+    excerpt does not swallow it. Falls back to the rule's plain-English check
+    description if the model returned no usable prose."""
+    reasoning = " ".join((verdict.reasoning or "").split())
+    for stop in (". ", "; "):
+        if stop in reasoning:
+            reasoning = reasoning.split(stop, 1)[0]
+            break
+    reasoning = reasoning.rstrip(".;")
+    if not reasoning:
+        reasoning = (rule.parameters.get("judge_focus") or rule.explanation).split(".")[0]
+    if len(reasoning) > SUMMARY_CHARS:
+        reasoning = reasoning[: SUMMARY_CHARS - 1].rstrip() + "…"
+    return f"Judgment call — {reasoning}"
+
+
 def _call_model(client, system: str, blocks: list[dict], model: str) -> _JudgeOutput:
     """Single API call; isolated so tests can monkeypatch it."""
     response = client.messages.parse(
@@ -289,7 +314,10 @@ def run_judge(
                 severity=rule.severity,
                 rule_id=rule.rule_id,
                 claim_id=_link_claim(v.evidence_text, claims),
-                summary=f"{rule.rule_id}: gray-area violation ({v.confidence} confidence)",
+                # Plain English for the reviewer: the judgment itself, not the
+                # rule id (the UI renders that as a chip beside the finding) and
+                # not the confidence (it rides in the explanation).
+                summary=_judgment_summary(v, rule),
                 explanation=explanation,
                 citation_url=rule.authorities[0].url,
                 suggested_redline=v.suggested_redline,

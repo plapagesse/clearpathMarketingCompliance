@@ -353,9 +353,13 @@ def verify_passed_rules(
             continue
         seen.add(v.rule_id)
         rule, kind = rules_by_id[v.rule_id]
+        # The prefix is the audit marker for "this came from the double-check,
+        # not from the deterministic engine"; the model's own reason follows
+        # verbatim, because a paraphrase would lose the evidence it cites.
         explanation = f"Pass verifier (model double-check): {v.reason}"
         if v.evidence_text.strip():
             explanation += f' Evidence: "{v.evidence_text.strip()}"'
+        check = rule.parameters.get("check_description") or rule.explanation
         findings.append(
             Finding(
                 id=f"fnd-{submission.submission_id}-pv-{len(findings) + 1:03d}",
@@ -363,8 +367,11 @@ def verify_passed_rules(
                 severity=Severity.LOW,  # needs-verification convention: below medium
                 rule_id=rule.rule_id,
                 claim_id=None,
-                summary=f"Needs verification: pass verifier disputes the '{rule.rule_id}' pass",
-                explanation=explanation,
+                summary=(
+                    "Needs verification: a second read of the creative disputes this rule's "
+                    "clean result"
+                ),
+                explanation=f"{explanation} The rule that passed: {check}",
                 citation_url=rule.authorities[0].url,
                 suggested_redline=None,
             )
