@@ -174,7 +174,7 @@ export interface TriggeringTermPayload {
 
 /** normalized_fields payload for claim type "rate_or_apr" */
 export interface RateOrAprPayload {
-  value_pct: number;
+  value_pct?: number | null;
   range_min_pct?: number | null;
   range_max_pct?: number | null;
   is_floor_claim?: boolean | null;
