@@ -57,7 +57,7 @@ def test_coverage_marker_says_what_happened_in_plain_english(rulebook, real_cell
     f = coverage_markers(result)[0]
     assert f.summary == (
         "Layout and spacing checks ran on extracted text only for this run; "
-        "proximity results may be incomplete"
+        "proximity and required-element results may be incomplete"
     )
     for jargon in ("text_plane", "text-plane", "claim_plane", "artifact text", "Token-bound"):
         assert jargon not in f.summary and jargon not in f.explanation
@@ -100,3 +100,27 @@ def test_no_coverage_marker_when_artifact_text_is_supplied(rulebook, real_cells)
         artifact_text="Guaranteed approval — regardless of credit history. Claim my loan.",
     )
     assert not coverage_markers(result)
+
+
+def test_degraded_required_element_absence_demotes_to_needs_verification(rulebook, real_cells):
+    """Concluding a required element is ABSENT from concatenated fragments is
+    exactly as unsupported as a proximity distance measured on them, so in
+    degraded mode element_required never carries the rule's full severity
+    (MTG-NMLS-001 is HIGH with full text; here it must flag LOW)."""
+    sub = make_submission(
+        product="mortgage_prequal", surface="mortgage_rate_table",
+        template_id="CK-MTG-TABLE", offer_ids=["MTG-30F"],
+        states_targeted="ALL except AK;HI;NY;VT;WV",
+    )
+    result = run(
+        rulebook,
+        submission=sub,
+        cells=[real_cells["MTG-30F"]],
+        artifact_text=None,
+    )
+    matches = [f for f in result.findings if f.rule_id == "MTG-NMLS-001"]
+    assert matches
+    for f in matches:
+        assert f.severity == Severity.LOW
+        assert f.summary.startswith("Needs verification:")
+        assert "could not confirm" in f.summary

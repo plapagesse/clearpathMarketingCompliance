@@ -650,6 +650,23 @@ def _element_required(rule: RulebookEntry, ctx: _Ctx, params: dict | None = None
         element,
         (f"The creative is missing the required {label}", f"Add the {label} to the creative."),
     )
+    if detection and ctx.degraded_text:
+        # Same safety belt as proximity: when the text fallback would have been
+        # searched but only concatenated fragments were available, "absent" is a
+        # conclusion the evidence cannot fully support, so it never carries the
+        # rule's full severity.
+        ctx.emit(
+            rule, CheckClass.LEGALITY,
+            f"Needs verification: could not confirm the {label} is on the creative",
+            f"{rule.explanation} Nothing captured from the creative was read as the {label}, "
+            "but the creative's full text in reading order was not available for this run, so "
+            "only the captured fragments could be searched. Re-run this submission, or check "
+            "the placement by eye.",
+            severity=Severity.LOW,
+            suggested_redline=f"Re-run this submission, or confirm by eye that the {label} "
+                              "is present.",
+        )
+        return
     ctx.emit(
         rule, CheckClass.LEGALITY,
         summary,
@@ -847,11 +864,12 @@ def _ground_truth_consistency(rule: RulebookEntry, ctx: _Ctx, params: dict | Non
                     return lo <= value[0] and value[1] <= hi
                 return lo <= value <= hi
             if not any(_contains(c) for c in ctx.cells):
-                ranges = [
-                    f"{c.offer_id} allows {_fmt(_matrix_bounds(c, matrix_field)[0])}"
-                    f"–{_fmt(_matrix_bounds(c, matrix_field)[1])}"
-                    for c in ctx.cells
-                ]
+                def _range_prose(cell):
+                    lo, hi = _matrix_bounds(cell, matrix_field)
+                    if lo is None or hi is None:
+                        return f"{cell.offer_id} states no figure for this"
+                    return f"{cell.offer_id} allows {_fmt(lo)}–{_fmt(hi)}"
+                ranges = [_range_prose(c) for c in ctx.cells]
                 if claim_field == "review_date":
                     # The staleness check: the "claim" is the review date, so the
                     # defect is the offer's effective window, not a number the
@@ -889,7 +907,8 @@ def _ground_truth_consistency(rule: RulebookEntry, ctx: _Ctx, params: dict | Non
                     return mv == value
             if not any(_eq(c) for c in ctx.cells):
                 actual = "; ".join(
-                    f"{c.offer_id}: {_fmt(_matrix_bounds(c, matrix_field))}" for c in ctx.cells
+                    f"{c.offer_id}: {_fmt(mv) if (mv := _matrix_bounds(c, matrix_field)) is not None else 'no stated figure'}"
+                    for c in ctx.cells
                 )
                 ctx.emit(
                     rule, CheckClass.TRUTHFULNESS,
@@ -1204,7 +1223,7 @@ def run_checks(
         ctx.emit(
             None, CheckClass.LEGALITY,
             "Layout and spacing checks ran on extracted text only for this run; proximity "
-            "results may be incomplete",
+            "and required-element results may be incomplete",
             "The creative's full text in reading order was not available, so the wording checks "
             "ran against the captured claims and disclosures instead. Anything about what sits "
             "next to what on the page should be confirmed by eye.",

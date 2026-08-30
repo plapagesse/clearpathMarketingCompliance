@@ -10,7 +10,8 @@
     "(then|thereafter|after that)[^.]{0,40}\\d{1,2}(\\.\\d{1,2})?\\s?%",
     "post[- ](intro|promo)",
     "\\d{1,2}(\\.\\d{1,3})?\\s?%\\s?[-–—]\\s?\\d{1,2}(\\.\\d{1,3})?\\s?%",
-    "(annual|balance[- ]transfer|origination|late|cash[- ]advance|maintenance|transfer) fee",
+    "(annual|balance[- ]transfer|origination|late|cash[- ]advance|maintenance|transfer) fee[^.]{0,15}(\\$\\s?\\d|\\d{1,2}(\\.\\d{1,2})?\\s?%)",
+    "(\\$\\s?\\d[\\d,.]*|\\d{1,2}(\\.\\d{1,2})?\\s?%)[^.]{0,20}(annual|balance[- ]transfer|origination|late|cash[- ]advance|maintenance|transfer) fee",
     "\\bfinance charge\\b",
     "fee of \\d",
     "\\d{1,3} (equal )?monthly (payments|installments)",
@@ -22,7 +23,7 @@
     "your rate may be higher",
     "(lowest|best) (apr|rate) requires",
     "requires (autopay|enrollment|excellent credit)",
-    "rates? (vary|may vary)"
+    "rates? (may )?vary (based on|depending on|with) (your )?(credit|creditworthiness|qualification)"
   ],
   "not_guaranteed": [
     "not a guarantee of approval",
