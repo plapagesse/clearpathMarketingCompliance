@@ -58,15 +58,15 @@
       },
       {
         "rule_area": "missing_not_guaranteed_qualifier",
-        "check_class": "legality",
-        "severity": "high",
+        "check_class": "judgment",
+        "severity": "medium",
         "claim_text": null,
         "expected_claim_type": null,
         "expected_rule_ids": [
           "PL-JUDGE-001"
         ],
         "location_note": "approval-not-guaranteed qualifier absent from fine print (present in approved v7 template)",
-        "description": "The approval-not-guaranteed qualifier present in the approved v7 fine print is absent, compounding the approval misrepresentation."
+        "description": "The approval-not-guaranteed qualifier present in the approved v7 fine print is absent, compounding the approval misrepresentation. (judge-covered pending the qualifier-rule gap fix — no deterministic rule requires the qualifier for 'pre-approved'-only creative)"
       }
     ]
   },
