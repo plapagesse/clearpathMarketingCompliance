@@ -14,7 +14,7 @@ import csv
 from datetime import date
 from pathlib import Path
 
-from backend.contracts import OfferCell, Submission
+from backend.contracts import OfferCell, Submission, SubmissionMode
 
 US_STATES = [
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI",
@@ -125,11 +125,18 @@ def load_submissions(csv_path: str | Path) -> list[Submission]:
     The internal ``id`` is set to the partner-facing ``submission_id``; the
     ``states_targeted`` raw string is preserved as-is per the frozen contract
     (use :func:`normalize_states_targeted` when a list is needed).
+
+    Contract fields with defaults are still READ from the CSV when the column
+    is present ("mode", "status", "baseline_submission_id"); the default
+    applies only when the column is absent or the cell is empty — never
+    silently overriding a populated cell.
     """
     submissions: list[Submission] = []
     with open(csv_path, newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             submission_id = row["submission_id"].strip()
+            mode = (row.get("mode") or "").strip() or SubmissionMode.PRE_PUBLICATION
+            baseline = (row.get("baseline_submission_id") or "").strip() or None
             submissions.append(
                 Submission(
                     id=submission_id,
@@ -151,6 +158,8 @@ def load_submissions(csv_path: str | Path) -> list[Submission]:
                     change_summary=row.get("change_summary", "").strip(),
                     status=row.get("status", "").strip() or "pending_review",
                     sla_due=_opt_date(row.get("sla_due")),
+                    mode=mode,
+                    baseline_submission_id=baseline,
                 )
             )
     return submissions

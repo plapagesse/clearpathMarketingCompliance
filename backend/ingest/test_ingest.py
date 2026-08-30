@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.contracts import BadgeDesignation, Product
+from backend.contracts import BadgeDesignation, Product, SubmissionMode
 from backend.ingest import (
     load_offer_matrix,
     load_submissions,
@@ -14,6 +14,7 @@ from backend.ingest.parsers import US_STATES
 TESTDATA = Path(__file__).parent / "testdata"
 MATRIX_CSV = TESTDATA / "clearpath_offer_matrix.csv"
 SUBMISSIONS_CSV = TESTDATA / "ck_placement_submissions.csv"
+SUBMISSIONS_V2_CSV = TESTDATA / "submissions_v2.csv"
 
 
 def test_offer_matrix_rows_and_spot_values():
@@ -59,6 +60,30 @@ def test_submissions_rows_and_spot_values():
     prescreen = by_id["SUB-2026-0144"]
     assert prescreen.badge_text == "Pre-approved"
     assert "short-form opt-out notice" in prescreen.disclosures_included
+
+
+def test_submissions_v2_mode_and_baseline_columns():
+    """Regression: mode/baseline_submission_id columns must be read, not silently defaulted."""
+    subs = load_submissions(SUBMISSIONS_V2_CSV)
+    assert len(subs) == 10
+
+    verification = [s for s in subs if s.mode == SubmissionMode.VERIFICATION]
+    assert len(verification) == 1
+    seed_capture = verification[0]
+    assert seed_capture.submission_id == "SUB-2026-0151"
+    assert seed_capture.baseline_submission_id == "SUB-2026-0142"
+    assert seed_capture.requested_launch is None  # empty cell in a middle column
+
+    pre_pub = [s for s in subs if s.mode == SubmissionMode.PRE_PUBLICATION]
+    assert len(pre_pub) == 9
+    assert all(s.baseline_submission_id is None for s in pre_pub)
+
+
+def test_submissions_legacy_csv_defaults_when_columns_absent():
+    """The original no-mode-column CSV still parses with explicit defaults."""
+    subs = load_submissions(SUBMISSIONS_CSV)
+    assert all(s.mode == SubmissionMode.PRE_PUBLICATION for s in subs)
+    assert all(s.baseline_submission_id is None for s in subs)
 
 
 def test_normalize_states_targeted():

@@ -108,6 +108,8 @@ export interface Submission {
   status: string
   sla_due: string | null // ISO date
   mode: SubmissionMode
+  // verification mode: the APPROVED submission this evidence is diffed against
+  baseline_submission_id: string | null
 }
 
 export interface Finding {

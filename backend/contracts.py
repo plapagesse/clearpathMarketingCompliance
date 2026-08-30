@@ -193,6 +193,10 @@ class Submission(BaseModel):
     status: str = "pending_review"
     sla_due: date | None = None
     mode: SubmissionMode = SubmissionMode.PRE_PUBLICATION
+    baseline_submission_id: str | None = Field(
+        default=None,
+        description="verification mode: the APPROVED submission this evidence is diffed against (fidelity join key)",
+    )
 
 
 # --------------------------------------------------------------------------- #

@@ -118,6 +118,7 @@ class SubmissionRow(Base):
     status: Mapped[str] = mapped_column(String, default="pending_review")
     sla_due: Mapped[date | None] = mapped_column(Date, nullable=True)
     mode: Mapped[str] = mapped_column(String, default="pre_publication")
+    baseline_submission_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     check_runs: Mapped[list["CheckRunRow"]] = relationship(back_populates="submission")
 
@@ -143,6 +144,7 @@ class SubmissionRow(Base):
             status=self.status,
             sla_due=self.sla_due,
             mode=self.mode,
+            baseline_submission_id=self.baseline_submission_id,
         )
 
     @classmethod
