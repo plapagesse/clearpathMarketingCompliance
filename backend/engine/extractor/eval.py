@@ -75,6 +75,13 @@ def _grade_values(expected: dict, got: dict) -> list[dict]:
     (empty list = all values correct)."""
     mismatches = []
     for field, want in expected.items():
+        if want is None:
+            # expected-null: absent and present-as-null both pass; only a
+            # concrete value is a mismatch ('missing' applies to non-null only)
+            have = got.get(field)
+            if have is not None:
+                mismatches.append({"field": field, "expected": None, "got": have, "reason": "value"})
+            continue
         if field not in got:
             mismatches.append({"field": field, "expected": want, "got": None, "reason": "missing"})
             continue

@@ -382,3 +382,12 @@ def test_eval_value_grading_end_to_end(tmp_path, monkeypatch):
     bad = next(r for r in graded if not r["value_ok"])
     assert bad["value_mismatches"][0]["field"] == "value_pct"
     assert bad["value_mismatches"][0]["expected"] == 9.99
+
+
+def test_grade_values_expected_null_semantics():
+    """Expected-null passes when the field is absent OR present-as-null; only a
+    concrete value fails (reason 'value', never 'missing')."""
+    assert ev._grade_values({"fixed_period_stated": None}, {}) == []
+    assert ev._grade_values({"fixed_period_stated": None}, {"fixed_period_stated": None}) == []
+    mm = ev._grade_values({"fixed_period_stated": None}, {"fixed_period_stated": "15 months"})
+    assert len(mm) == 1 and mm[0]["reason"] == "value" and mm[0]["got"] == "15 months"
