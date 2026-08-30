@@ -9,7 +9,7 @@
   text-align: left;
 }
 
-.queue-bar {
+.queue .queue-bar {
   display: flex;
   align-items: center;
   gap: 20px;
@@ -18,25 +18,25 @@
   flex-wrap: wrap;
 }
 
-.queue-bar select {
+.queue .queue-bar select {
   padding: 4px 6px;
   font-size: 14px;
 }
 
-.counter {
+.queue .counter {
   margin-left: auto;
   font-size: 18px;
 }
 
-.muted {
+.queue .muted {
   color: #777;
 }
 
-.small {
+.queue .small {
   font-size: 12px;
 }
 
-.error {
+.queue .error {
   background: #fdecea;
   border: 1px solid #e5b3ad;
   padding: 8px 10px;
@@ -45,43 +45,43 @@
 
 /* --- two-pane review: screenshot left, everything else right --- */
 
-.review {
+.queue .review {
   display: flex;
   gap: 24px;
   align-items: flex-start;
   margin-top: 16px;
 }
 
-.shot-pane {
+.queue .shot-pane {
   flex: 0 0 60%;
   border: 1px solid #ddd;
   background: #fafafa;
   padding: 8px;
 }
 
-.shot {
+.queue .shot {
   display: block;
   width: 100%;
   height: auto;
 }
 
-.side-pane {
+.queue .side-pane {
   flex: 1;
   min-width: 300px;
 }
 
-.ident {
+.queue .ident {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.ident h2 {
+.queue .ident h2 {
   margin: 0;
   font-size: 20px;
 }
 
-.badge {
+.queue .badge {
   border: 1px solid #bbb;
   border-radius: 3px;
   padding: 2px 8px;
@@ -90,35 +90,35 @@
   letter-spacing: 0.04em;
 }
 
-.badge-proposed {
+.queue .badge-proposed {
   background: #eef2f7;
   border-color: #b8c6d8;
   color: #33506f;
 }
 
-.badge-production {
+.queue .badge-production {
   background: #f2eef7;
   border-color: #c6b8d8;
   color: #563f6f;
 }
 
-.sla {
+.queue .sla {
   margin: 6px 0 2px;
   font-size: 14px;
 }
 
-.sla.overdue {
+.queue .sla.overdue {
   color: #b3261e;
   font-weight: bold;
 }
 
-.block {
+.queue .block {
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid #eee;
 }
 
-.block h3 {
+.queue .block h3 {
   margin: 0 0 6px;
   font-size: 14px;
   text-transform: uppercase;
@@ -126,7 +126,7 @@
   color: #666;
 }
 
-button {
+.queue button {
   font: inherit;
   padding: 6px 14px;
   border: 1px solid #999;
@@ -134,38 +134,38 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+.queue button:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
 /* --- AI status banner --- */
 
-.banner {
+.queue .banner {
   padding: 10px 12px;
   border: 1px solid;
   font-weight: bold;
   margin-bottom: 12px;
 }
 
-.banner-count {
+.queue .banner-count {
   font-weight: normal;
   font-size: 13px;
 }
 
-.banner-quick_check {
+.queue .banner-quick_check {
   background: #eaf6ec;
   border-color: #a8ceb1;
   color: #245c31;
 }
 
-.banner-needs_attention {
+.queue .banner-needs_attention {
   background: #fdf3e2;
   border-color: #dfc088;
   color: #7a5410;
 }
 
-.banner-high_attention {
+.queue .banner-high_attention {
   background: #fdecea;
   border-color: #e5b3ad;
   color: #8a1c12;
@@ -173,19 +173,19 @@ button:disabled {
 
 /* --- findings --- */
 
-.finding {
+.queue .finding {
   border-left: 3px solid #ddd;
   padding: 6px 0 6px 10px;
   margin-bottom: 12px;
 }
 
-.finding-head {
+.queue .finding-head {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.chip {
+.queue .chip {
   border-radius: 3px;
   padding: 1px 7px;
   font-size: 11px;
@@ -193,38 +193,38 @@ button:disabled {
   border: 1px solid;
 }
 
-.chip-critical,
-.chip-high {
+.queue .chip-critical,
+.queue .chip-high {
   background: #fdecea;
   border-color: #e5b3ad;
   color: #8a1c12;
 }
 
-.chip-medium {
+.queue .chip-medium {
   background: #fdf3e2;
   border-color: #dfc088;
   color: #7a5410;
 }
 
-.chip-low,
-.chip-info {
+.queue .chip-low,
+.queue .chip-info {
   background: #f0f0f0;
   border-color: #ccc;
   color: #555;
 }
 
-.rule {
+.queue .rule {
   font-family: ui-monospace, monospace;
   font-size: 12px;
   color: #555;
 }
 
-.finding-summary {
+.queue .finding-summary {
   margin: 4px 0;
   font-size: 14px;
 }
 
-.redline {
+.queue .redline {
   margin: 4px 0;
   font-size: 13px;
   background: #f7f7f2;
@@ -234,7 +234,7 @@ button:disabled {
 
 /* --- history + decision --- */
 
-.history {
+.queue .history {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -242,7 +242,7 @@ button:disabled {
   line-height: 1.7;
 }
 
-.note {
+.queue .note {
   font: inherit;
   width: 100%;
   padding: 6px;
@@ -250,24 +250,24 @@ button:disabled {
   box-sizing: border-box;
 }
 
-.actions {
+.queue .actions {
   display: flex;
   gap: 8px;
   align-items: center;
   margin-top: 10px;
 }
 
-.approve {
+.queue .approve {
   background: #eaf6ec;
   border-color: #a8ceb1;
 }
 
-.reject {
+.queue .reject {
   background: #fdecea;
   border-color: #e5b3ad;
 }
 
-.linkish {
+.queue .linkish {
   border: none;
   background: none;
   color: #33506f;
@@ -276,11 +276,11 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  .review {
+  .queue .review {
     flex-direction: column;
   }
 
-  .shot-pane {
+  .queue .shot-pane {
     flex: 1 1 auto;
     width: 100%;
     box-sizing: border-box;

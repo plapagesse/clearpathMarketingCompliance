@@ -3,6 +3,9 @@
 One submission at a time, most urgent first. A submission leaves the queue the
 moment a ReviewDecisionRow exists for it, so `remaining` is the honest count of
 what is still on the reviewer's plate.
+
+Screenshots are served by the input view's /api/review/evidence/<file> route;
+this module only resolves the on-disk path when it needs to feed the engine.
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ import uuid
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
 from backend.db.models import CheckRunRow, FindingRow, ReviewDecisionRow, SubmissionRow
@@ -103,7 +106,9 @@ def _item(session, sub: SubmissionRow) -> dict:
         "partner": sub.partner,
         "surface": sub.surface,
         "proposed_headline": sub.proposed_headline,
-        "image_url": f"/api/queue/evidence/{filename}" if filename else None,
+        # Served by the input view's blueprint — same uploads/-then-fixtures/
+        # lookup, so there is no reason for a second copy of that route here.
+        "image_url": f"/api/review/evidence/{filename}" if filename else None,
         "sla_due": sub.sla_due.isoformat() if sub.sla_due else None,
         "days_left": _days_left(sub.sla_due),
         "input_type": _input_type(sub.mode),
@@ -141,16 +146,6 @@ def _decided_ids(session) -> list[str]:
 # --------------------------------------------------------------------------- #
 # routes
 # --------------------------------------------------------------------------- #
-
-
-@queue_bp.get("/evidence/<path:filename>")
-def evidence(filename: str):
-    """Serve an evidence artifact by basename — uploads/ first, then fixtures/."""
-    safe = Path(filename).name  # basename only: no traversal out of the two dirs
-    directory = _evidence_dir(safe)
-    if directory is None:
-        return jsonify({"error": f"evidence not found: {safe}"}), 404
-    return send_from_directory(directory, safe)
 
 
 @queue_bp.get("")

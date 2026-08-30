@@ -151,7 +151,7 @@ def test_item_reports_input_type_days_left_and_image_url(client):
 
     assert items[0]["input_type"] == "proposed"
     assert items[0]["days_left"] == 3
-    assert items[0]["image_url"] == "/api/queue/evidence/mock_pl_card_compliant.png"
+    assert items[0]["image_url"] == "/api/review/evidence/mock_pl_card_compliant.png"
     assert items[1]["input_type"] == "production"
 
 
@@ -304,15 +304,16 @@ def test_detail_of_unknown_submission_is_404(client):
 # --------------------------------------------------------------------------- #
 
 
-def test_evidence_serves_a_fixture_png(client):
-    resp = client.get("/api/queue/evidence/mock_pl_card_compliant.png")
+def test_item_image_url_is_actually_servable(client):
+    """The queue points at the input view's evidence route — check they agree."""
+    _add_submission("SUB-IMG", date(2026, 9, 1))
 
+    image_url = client.get("/api/queue").get_json()["items"][0]["image_url"]
+    assert image_url == "/api/review/evidence/mock_pl_card_compliant.png"
+
+    resp = client.get(image_url)
     assert resp.status_code == 200
     assert resp.data[:8] == b"\x89PNG\r\n\x1a\n"
-
-
-def test_evidence_ignores_path_traversal(client):
-    assert client.get("/api/queue/evidence/../../backend/app.py").status_code == 404
 
 
 def test_process_returns_503_without_api_key(client, monkeypatch):
