@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -115,6 +116,128 @@ class Claim(BaseModel):
     text: str = Field(description="Verbatim claim text as rendered")
     location: str = Field(description="Where in the artifact (e.g. 'headline', 'fine print', 'badge')")
     source_evidence_id: str
+    normalized_fields: dict = Field(
+        default_factory=dict,
+        description=(
+            "Amendment #5: union of the payload contracts of every listed claim "
+            "type — typed per CLAIM_TYPE_PAYLOADS; validate with validate_claim_payload()"
+        ),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Claim-type payload models (amendment #5)
+#
+# One pydantic model per ClaimType; field names come EXACTLY from
+# rulebook/claim_types_legal_map.json normalized_fields ('?'-suffixed spec
+# fields are Optional with None default; the rest are required). A sync test
+# in the extractor suite enforces model<->spec drift discipline.
+# --------------------------------------------------------------------------- #
+
+
+class TriggeringTermPayload(BaseModel):
+    payment_amount: float | None = None
+    num_payments: int | None = None
+    term_months: int | None = None
+    downpayment: float | None = None
+    finance_charge: float | None = None
+
+
+class RateOrAprPayload(BaseModel):
+    value_pct: float | None = None
+    range_min_pct: float | None = None
+    range_max_pct: float | None = None
+    is_floor_claim: bool
+    labeled_as_apr: bool
+    rate_kind: Literal["apr", "interest_rate", "unlabeled"]
+
+
+class PromotionalOrIntroductoryPayload(BaseModel):
+    promo_rate_pct: float
+    promo_period_months: int | None = None
+    has_intro_word: bool
+    is_deferred_interest: bool
+    post_promo_rate_stated: bool
+
+
+class FixedRateRepresentationPayload(BaseModel):
+    applies_to_rate: bool
+    fixed_period_stated: str | None = None
+
+
+class ApprovalOrPrequalificationPayload(BaseModel):
+    badge_word: str
+    strength: Literal[
+        "guaranteed", "pre_approved", "prequalified",
+        "odds_numeric", "odds_qualitative", "invitation",
+    ]
+    odds_value_pct: float | None = None
+
+
+class FeeOrCostPayload(BaseModel):
+    fee_claim_kind: Literal["absence_of_fee", "specific_fee_amount", "fee_disclosure"]
+    fee_type: Literal[
+        "annual_fee", "origination_fee", "closing_costs", "balance_transfer_fee", "other"
+    ] | None = None
+    amount_value: float | None = None
+
+
+class EndorsementOrTestimonialPayload(BaseModel):
+    endorser_named: bool
+    material_connection_disclosed: bool
+    atypical_result_claimed: bool
+    result_claim_text: str | None = None
+
+
+class GovernmentAffiliationPayload(BaseModel):
+    agency_or_program: str | None = None
+    is_program_reference: bool
+    affiliation_implied: bool
+
+
+class GeneralUdaapRepresentationPayload(BaseModel):
+    representation_kind: Literal[
+        "urgency_device", "comparative_superlative", "amount_offered", "savings_claim",
+        "soft_pull_claim", "debt_elimination", "geographic_availability", "other",
+    ]
+    amount_value: float | None = None
+    claimed_deadline: str | None = None
+    comparative_is_measurable: bool | None = None
+
+
+CLAIM_TYPE_PAYLOADS: dict[ClaimType, type[BaseModel]] = {
+    ClaimType.TRIGGERING_TERM: TriggeringTermPayload,
+    ClaimType.RATE_OR_APR: RateOrAprPayload,
+    ClaimType.PROMOTIONAL_OR_INTRODUCTORY: PromotionalOrIntroductoryPayload,
+    ClaimType.FIXED_RATE_REPRESENTATION: FixedRateRepresentationPayload,
+    ClaimType.APPROVAL_OR_PREQUALIFICATION: ApprovalOrPrequalificationPayload,
+    ClaimType.FEE_OR_COST: FeeOrCostPayload,
+    ClaimType.ENDORSEMENT_OR_TESTIMONIAL: EndorsementOrTestimonialPayload,
+    ClaimType.GOVERNMENT_AFFILIATION: GovernmentAffiliationPayload,
+    ClaimType.GENERAL_UDAAP_REPRESENTATION: GeneralUdaapRepresentationPayload,
+}
+
+
+def validate_claim_payload(claim: Claim) -> None:
+    """Union-semantics payload validation (amendment #5).
+
+    Every key in normalized_fields must belong to at least one listed claim
+    type's payload model (raises ValueError on unknown keys), and for each
+    listed type its required fields must be present and type-valid (raises
+    pydantic.ValidationError via the payload model)."""
+    known: set[str] = set()
+    for ct in claim.claim_types:
+        known |= set(CLAIM_TYPE_PAYLOADS[ct].model_fields)
+    unknown = set(claim.normalized_fields) - known
+    if unknown:
+        raise ValueError(
+            f"claim {claim.id}: normalized_fields keys {sorted(unknown)} belong to none of "
+            f"the listed claim types {[ct.value for ct in claim.claim_types]}"
+        )
+    for ct in claim.claim_types:
+        model = CLAIM_TYPE_PAYLOADS[ct]
+        subset = {k: v for k, v in claim.normalized_fields.items() if k in model.model_fields}
+        model.model_validate(subset)
 
 
 class Disclosure(BaseModel):

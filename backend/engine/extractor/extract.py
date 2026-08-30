@@ -37,7 +37,14 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 
-from backend.contracts import Claim, ClaimType, Disclosure, DisclosureType, Product
+from backend.contracts import (
+    Claim,
+    ClaimType,
+    Disclosure,
+    DisclosureType,
+    Product,
+    validate_claim_payload,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LEGAL_MAP_PATH = REPO_ROOT / "rulebook" / "claim_types_legal_map.json"
@@ -50,22 +57,14 @@ MAX_TOKENS = 16000
 # --------------------------------------------------------------------------- #
 
 
-class ExtractedClaim(Claim):
-    """A contract Claim plus the classification spec's normalized payload.
-
-    The frozen Claim contract carries no normalized_fields; the classification
-    spec (rulebook/claim_types_legal_map.json) defines a per-type payload
-    contract the checker consumes. Until/unless a contracts amendment adds the
-    field, the extractor ships this subclass — it IS a valid Claim (all
-    contract fields present and validated) with the payload alongside.
-    """
-
-    normalized_fields: dict = Field(default_factory=dict)
+# Amendment #5 moved normalized_fields into the Claim contract itself;
+# the ExtractedClaim subclass is gone. Deprecated alias for stray importers:
+ExtractedClaim = Claim
 
 
 class ExtractionResult(BaseModel):
     evidence_id: str
-    claims: list[ExtractedClaim]
+    claims: list[Claim]
     disclosures: list[Disclosure]
     model: str
     usage: dict = Field(default_factory=dict)  # input/output token counts
@@ -249,7 +248,7 @@ def _coerce(value: str):
 
 def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> ExtractionResult:
     claims = [
-        ExtractedClaim(
+        Claim(
             id=f"clm-{ctx.evidence_id}-{i:03d}",
             claim_types=c.claim_types,
             text=c.text,
@@ -319,10 +318,16 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
             ),
         }
     ]
-    try:
+    def _attempt() -> ExtractionResult:
         raw = _call_model(client, system, blocks, model)
+        result = _finalize(raw, context, model)
+        for c in result.claims:
+            validate_claim_payload(c)  # amendment #5: typed union-payload validation
+        return result
+
+    try:
+        return _attempt()
     except anthropic.APIStatusError:
         raise
     except (ValidationError, json.JSONDecodeError, ValueError):
-        raw = _call_model(client, system, blocks, model)  # one retry on malformed output
-    return _finalize(raw, context, model)
+        return _attempt()  # one retry on malformed output OR invalid payload

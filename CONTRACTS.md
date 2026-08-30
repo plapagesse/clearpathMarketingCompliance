@@ -13,6 +13,8 @@ One marketing claim extracted from an evidence artifact (mock, screenshot, HTML)
 
 **Amendment #4** (2026-08-29, user-directed, explicit): `Claim.claim_type` (singular) → `Claim.claim_types: ClaimType[]` (min length 1). One statement = one claim object; a span embodying multiple legal categories lists them all.
 
+**Amendment #5** (2026-08-29, user-directed, explicit): `Claim` gains `normalized_fields: dict` — the union of the listed claim types' payload contracts — and the payload contracts themselves become importable typed models: one pydantic model per ClaimType (field names exactly from `rulebook/claim_types_legal_map.json` `normalized_fields`; `'?'`-suffixed spec fields are Optional), registered in `CLAIM_TYPE_PAYLOADS`, validated with `validate_claim_payload()` (unknown keys rejected; each listed type's required fields present and type-valid). A sync test enforces model↔spec drift discipline.
+
 | Value | Legal anchor |
 |---|---|
 | `triggering_term` | Reg Z triggering terms — 12 CFR 1026.24(d) (closed-end) / 1026.16(b) (open-end): payment amounts, repayment periods, downpayments, finance charges |

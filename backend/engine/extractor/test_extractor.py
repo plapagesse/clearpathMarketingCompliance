@@ -110,6 +110,7 @@ def _fake_raw():
                 normalized_fields=[
                     ex._NormalizedField(key="value_pct", value="8.99"),
                     ex._NormalizedField(key="is_floor_claim", value="true"),
+                    ex._NormalizedField(key="labeled_as_apr", value="true"),
                     ex._NormalizedField(key="rate_kind", value="apr"),
                 ],
             )
@@ -133,7 +134,7 @@ def test_mocked_response_roundtrips_into_contracts(monkeypatch, png):
     assert result.claims[0].id == "clm-t1-000"
     assert result.claims[0].claim_types == [ClaimType.RATE_OR_APR]
     assert result.claims[0].source_evidence_id == "t1"
-    assert result.claims[0].normalized_fields == {"value_pct": 8.99, "is_floor_claim": True, "rate_kind": "apr"}
+    assert result.claims[0].normalized_fields == {"value_pct": 8.99, "is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "apr"}
     assert isinstance(result.disclosures[0], Disclosure)
     assert result.disclosures[0].prominence == "fine_print"
 
@@ -271,3 +272,113 @@ def test_workspace_header_on_identity_linked_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID")
     ex._make_client()
     assert "default_headers" not in captured
+
+
+# --------------------------------------------------------------------------- #
+# Amendment #5: typed payloads + value grading
+# --------------------------------------------------------------------------- #
+
+from backend.contracts import CLAIM_TYPE_PAYLOADS, validate_claim_payload  # noqa: E402
+
+
+def test_payload_registry_matches_spec():
+    """Drift discipline: each payload model's field set == the spec's
+    normalized_fields names for that type, required-ness matching '?' suffix."""
+    spec = ex.load_classification_spec()
+    assert set(CLAIM_TYPE_PAYLOADS) == set(ClaimType)
+    for ct, model in CLAIM_TYPE_PAYLOADS.items():
+        spec_fields = spec[ct.value]["normalized_fields"]
+        expected_names = {k.rstrip("?") for k in spec_fields}
+        assert set(model.model_fields) == expected_names, ct.value
+        for k in spec_fields:
+            name, optional = k.rstrip("?"), k.endswith("?")
+            assert model.model_fields[name].is_required() == (not optional), f"{ct.value}.{name}"
+
+
+def _claim(types, nf):
+    return Claim(id="c1", claim_types=types, text="x", location="body",
+                 source_evidence_id="e1", normalized_fields=nf)
+
+
+def test_payload_validation_accepts_valid_union():
+    validate_claim_payload(_claim(
+        [ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM],
+        {"promo_rate_pct": 0.0, "has_intro_word": True, "is_deferred_interest": False,
+         "post_promo_rate_stated": False, "term_months": 15},
+    ))
+
+
+def test_payload_validation_rejects_unknown_key():
+    with pytest.raises(ValueError, match="belong to none"):
+        validate_claim_payload(_claim([ClaimType.RATE_OR_APR],
+            {"is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "apr", "bogus_key": 1}))
+
+
+def test_payload_validation_rejects_missing_required():
+    with pytest.raises(ValidationError):
+        validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"value_pct": 8.99}))
+
+
+def test_payload_validation_rejects_wrong_type():
+    with pytest.raises(ValidationError):
+        validate_claim_payload(_claim([ClaimType.RATE_OR_APR],
+            {"is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "banana"}))
+
+
+def test_invalid_payload_joins_retry_path(monkeypatch, png):
+    calls = {"n": 0}
+
+    def flaky(client, system, blocks, model):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            bad = _fake_raw()
+            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
+            return bad
+        return _fake_raw()
+
+    monkeypatch.setattr(ex, "_call_model", flaky)
+    ctx = ex.ExtractionContext(product=Product.PERSONAL_LOAN, evidence_id="t5")
+    result = ex.extract(png, ctx, client=object())
+    assert calls["n"] == 2 and result.claims
+
+
+def test_grade_values_semantics():
+    got = {"value_pct": 8.99, "rate_kind": "apr", "is_floor_claim": True, "term_months": 15}
+    assert ev._grade_values({"value_pct": 8.99}, got) == []
+    assert ev._grade_values({"value_pct": 8.9901}, got) == []          # float tolerance
+    assert ev._grade_values({"rate_kind": "APR"}, got) == []            # casefold
+    assert ev._grade_values({"is_floor_claim": True}, got) == []
+    mm = ev._grade_values({"value_pct": 9.99, "absent": 1}, got)
+    assert {m["reason"] for m in mm} == {"value", "missing"}
+    assert ev._grade_values({"is_floor_claim": 1}, got)                 # bool vs int is NOT equal
+
+
+def test_eval_value_grading_end_to_end(tmp_path, monkeypatch):
+    """Span+type-matched findings with expected_normalized_fields get value-graded;
+    metric and mismatch diagnostics land in the report."""
+    fx = _tmp_fixtures(tmp_path, with_pngs=True)
+    key = json.loads((fx / "expected_findings.json").read_text())
+    key["mock_pl_card_compliant.html"]["expected_findings"] = [
+        {"rule_area": "t", "check_class": "truthfulness", "severity": "high",
+         "claim_text": "as low as 8.99%", "location_note": "n",
+         "expected_claim_type": "rate_or_apr",
+         "expected_normalized_fields": {"value_pct": 8.99, "rate_kind": "APR", "is_floor_claim": True}},
+        {"rule_area": "t2", "check_class": "truthfulness", "severity": "high",
+         "claim_text": "APR as low as 8.99%", "location_note": "n",
+         "expected_claim_type": "rate_or_apr",
+         "expected_normalized_fields": {"value_pct": 9.99}},
+    ]
+    (fx / "expected_findings.json").write_text(json.dumps(key))
+    monkeypatch.setattr(ev, "FIXTURES", fx)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-dummy")
+    monkeypatch.setattr(ex, "_call_model", lambda client, system, blocks, model: _fake_raw())
+    monkeypatch.setattr(ev, "REPORT_PATH", tmp_path / "report.json")
+    report = ev.run_eval()
+    assert report["value_graded_findings"] == 2
+    assert report["value_accuracy_on_matched"] == 0.5
+    mock = next(m for m in report["per_mock"] if m["mock"] == "mock_pl_card_compliant.html")
+    graded = [r for r in mock["detail"] if r.get("value_graded")]
+    assert len(graded) == 2
+    bad = next(r for r in graded if not r["value_ok"])
+    assert bad["value_mismatches"][0]["field"] == "value_pct"
+    assert bad["value_mismatches"][0]["expected"] == 9.99

@@ -68,6 +68,30 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().casefold()
 
 
+def _grade_values(expected: dict, got: dict) -> list[dict]:
+    """Value grading (amendment #5 eval): every expected key must be present in
+    the claim's normalized_fields with an equal value — floats within a small
+    tolerance, strings casefolded, bools/ints exact. Returns mismatch records
+    (empty list = all values correct)."""
+    mismatches = []
+    for field, want in expected.items():
+        if field not in got:
+            mismatches.append({"field": field, "expected": want, "got": None, "reason": "missing"})
+            continue
+        have = got[field]
+        if isinstance(want, bool) or isinstance(have, bool):
+            ok = want is have if isinstance(want, bool) and isinstance(have, bool) else False
+        elif isinstance(want, (int, float)) and isinstance(have, (int, float)):
+            ok = abs(float(want) - float(have)) < 1e-3
+        elif isinstance(want, str) and isinstance(have, str):
+            ok = want.casefold() == have.casefold()
+        else:
+            ok = want == have
+        if not ok:
+            mismatches.append({"field": field, "expected": want, "got": have, "reason": "value"})
+    return mismatches
+
+
 def _resolve_screenshots(fnames: list[str]) -> dict[str, Path]:
     """Map each mock key (…html basename, per the answer key) to its local PNG.
 
@@ -118,6 +142,7 @@ def run_eval() -> dict:
 
     per_mock: list[dict] = []
     tot_universe = tot_span = tot_type = tot_unmatched = 0
+    tot_value_graded = tot_value_hits = 0
 
     for fname, entry in sorted(entries.items()):
         meta = manifest.get(fname, {"product": entry.get("product", "personal_loan"), "surface": "", "partner": "", "mode": entry.get("mode", "")})
@@ -136,7 +161,7 @@ def run_eval() -> dict:
         ]
         matched_claim_ids: set[str] = set()
         rows = []
-        span_hits = type_hits = 0
+        span_hits = type_hits = value_graded = value_hits = 0
         for f in expected:
             want = _norm(f["claim_text"])
             best = None
@@ -151,9 +176,22 @@ def run_eval() -> dict:
                 got = [t.value for t in best.claim_types]
                 ok = f["expected_claim_type"] in got  # membership: claims are multi-label
                 type_hits += ok
-                rows.append({"claim_text": f["claim_text"], "matched": True,
-                             "expected_type": f["expected_claim_type"],
-                             "got_types": got, "type_ok": ok})
+                row = {"claim_text": f["claim_text"], "matched": True,
+                       "expected_type": f["expected_claim_type"],
+                       "got_types": got, "type_ok": ok}
+                exp_values = f.get("expected_normalized_fields")
+                if ok and exp_values:  # value grading only on span+type matches
+                    mismatches = _grade_values(exp_values, best.normalized_fields)
+                    row["value_graded"] = True
+                    row["value_ok"] = not mismatches
+                    value_graded += 1
+                    value_hits += not mismatches
+                    if mismatches:
+                        row["value_mismatches"] = mismatches
+                        for mm in mismatches:
+                            print(f"  VALUE MISMATCH in {fname} [{mm['field']}]: "
+                                  f"expected {mm['expected']!r}, got {mm['got']!r}", file=sys.stderr)
+                rows.append(row)
             else:
                 rows.append({"claim_text": f["claim_text"], "matched": False,
                              "expected_type": f["expected_claim_type"],
@@ -176,6 +214,8 @@ def run_eval() -> dict:
         tot_span += span_hits
         tot_type += type_hits
         tot_unmatched += unmatched
+        tot_value_graded += value_graded
+        tot_value_hits += value_hits
         print(f"{fname}: {span_hits}/{len(expected)} spans, {type_hits} types ok, "
               f"{len(claims)} claims, {len(result.disclosures)} disclosures")
 
@@ -186,6 +226,8 @@ def run_eval() -> dict:
         "universe_claim_anchored_findings": tot_universe,
         "claim_recall": round(tot_span / tot_universe, 3) if tot_universe else None,
         "type_accuracy_on_matched": round(tot_type / tot_span, 3) if tot_span else None,
+        "value_graded_findings": tot_value_graded,
+        "value_accuracy_on_matched": round(tot_value_hits / tot_value_graded, 3) if tot_value_graded else None,
         "unmatched_extracted_claims_total": tot_unmatched,
         "per_mock": per_mock,
     }
@@ -197,6 +239,7 @@ def run_eval() -> dict:
         r = f"{m['span_matched']}/{m['expected_claim_anchored']}"
         print(f"{m['mock']:44s} {r:>8s} {m['type_correct']:>6d} {m['claims_extracted']:>7d} {m['disclosures_found']:>6d}")
     print(f"\nclaim recall: {report['claim_recall']}  |  type accuracy on matched: {report['type_accuracy_on_matched']}"
+          f"  |  value accuracy on matched: {report['value_accuracy_on_matched']}"
           f"  |  extra claims (informational): {tot_unmatched}")
     print(f"report: {REPORT_PATH}")
     return report
