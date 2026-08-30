@@ -385,17 +385,20 @@ def compliant_pl_disclosures() -> list[Disclosure]:
 
 
 @pytest.fixture()
-def cc_intro_submission() -> Submission:
-    # SUB-2026-0149 (mock_cc_card_intro_violations)
+def cc_net_impression_submission() -> Submission:
+    # SUB-2026-0149 (mock_cc_card_net_impression) — the one fixture whose SOLE
+    # planted violation is a judgment call: every deterministic Reg Z defect of
+    # the earlier v5 draft was fixed in the creative, leaving the fee/interest
+    # net-impression question (CC-JUDGE-001) for the judge.
     return make_submission(
         Product.CREDIT_CARD,
         id="SUB-2026-0149",
         submission_id="SUB-2026-0149",
         surface="marketplace_offer_card",
         template_id="CK-CC-CARD",
-        template_version="v5-draft",
+        template_version="v5",
         offer_ids=["CC-PLAT"],
-        proposed_headline="0% APR for 15 months",
+        proposed_headline="0% intro APR for 15 months",
         badge_text="Prequalified",
         states_targeted="ALL",
     )
@@ -405,13 +408,13 @@ CC_FEE_CLAIM_TEXT = "No annual fee. No interest. No brainer."
 
 
 @pytest.fixture()
-def cc_intro_claims() -> list[Claim]:
-    ev = "mock_cc_card_intro_violations"
+def cc_net_impression_claims() -> list[Claim]:
+    ev = "mock_cc_card_net_impression"
     return [
         make_claim(
             "clm-cc0149-000",
             [ClaimType.PROMOTIONAL_OR_INTRODUCTORY],
-            "0% APR for 15 months",
+            "0% intro APR for 15 months",
             "headline",
             ev,
             {
@@ -431,11 +434,23 @@ def cc_intro_claims() -> list[Claim]:
 
 
 @pytest.fixture()
-def cc_intro_disclosures() -> list[Disclosure]:
-    ev = "mock_cc_card_intro_violations"
+def cc_net_impression_disclosures() -> list[Disclosure]:
+    # SUB-2026-0149's manifest: the companion open-end disclosures are all
+    # present now (that is why the deterministic trigger rule is satisfied and
+    # only the net-impression judgment call remains).
+    ev = "mock_cc_card_net_impression"
     return [
-        make_disclosure(f"dsc-{ev}-000", DisclosureType.OTHER,
-                        "After the promotional period, a variable APR of 19.24%-29.24% applies. Balance transfer fee: 3%.",
+        make_disclosure(f"dsc-{ev}-000", DisclosureType.SOFT_PULL,
+                        "Prequalification uses a soft credit pull and is not a guarantee of approval.",
+                        "fine print", "fine_print"),
+        make_disclosure(f"dsc-{ev}-001", DisclosureType.INTRO_ADJACENCY,
+                        "The introductory rate applies to purchases for 15 billing cycles from account opening.",
+                        "fine print", "fine_print"),
+        make_disclosure(f"dsc-{ev}-002", DisclosureType.TRIGGER_DISCLOSURE,
+                        "Then a variable APR of 19.24%-29.24% applies, based on your creditworthiness and the Prime Rate.",
+                        "under the headline", "body"),
+        make_disclosure(f"dsc-{ev}-003", DisclosureType.TRIGGER_DISCLOSURE,
+                        "Balance transfers are charged a transfer fee of 3% of each transfer ($5 minimum). $0 annual fee.",
                         "footer", "fine_print"),
     ]
 
@@ -482,38 +497,53 @@ def preapproved_claims() -> list[Claim]:
 
 @pytest.fixture()
 def mortgage_submission() -> Submission:
-    # SUB-2026-0150 (mock_mtg_arm_as_fixed)
+    # SUB-2026-0156 (mock_lt_mtg_preapproved_gov) — the violating mortgage
+    # fixture. (SUB-2026-0150 was rewritten as a CLEAN ARM offer in the
+    # fixture rebalance, so it no longer carries a mortgage violation.)
     return make_submission(
         Product.MORTGAGE_PREQUAL,
-        id="SUB-2026-0150",
-        submission_id="SUB-2026-0150",
-        surface="mortgage_rate_module",
-        template_id="CK-MTG-TABLE",
-        template_version="v10-draft",
-        offer_ids=["MTG-ARM"],
-        proposed_headline="Lock in a fixed low rate of {{rate}}",
-        badge_text="Prequalified",
+        id="SUB-2026-0156",
+        submission_id="SUB-2026-0156",
+        partner="lendingtree",
+        surface="lead_form_hero",
+        template_id="LT-MTG-HERO",
+        template_version="v2-draft",
+        offer_ids=["MTG-30F", "MTG-ARM"],
+        proposed_headline="Pre-approved government-backed loans — rates locked forever",
+        badge_text="Pre-approved",
         states_targeted="ALL except AK;HI;NY;VT;WV",
     )
 
 
 @pytest.fixture()
 def mortgage_claims() -> list[Claim]:
-    ev = "mock_mtg_arm_as_fixed"
+    """The three claim-anchored rows the answer key plants on
+    mock_lt_mtg_preapproved_gov.html (claim_text and expected_claim_type
+    verbatim from fixtures/expected_findings.json)."""
+    ev = "mock_lt_mtg_preapproved_gov"
     return [
         make_claim(
-            "clm-mtg0150-000",
-            [ClaimType.FIXED_RATE_REPRESENTATION],
-            "Lock in a fixed low rate of 6.250%",
+            "clm-mtg0156-000",
+            [ClaimType.APPROVAL_OR_PREQUALIFICATION],
+            "Pre-approved government-backed loans — rates locked forever",
             "headline",
             ev,
             {},
         ),
         make_claim(
-            "clm-mtg0150-001",
-            [ClaimType.TRIGGERING_TERM],
-            "Pay just $2,463/month on a $400,000 loan",
-            "subheadline",
+            "clm-mtg0156-001",
+            [ClaimType.FIXED_RATE_REPRESENTATION],
+            "Your 5/6 ARM rate is fixed for the life of the loan.",
+            "orange emphasis line directly under the headline",
+            ev,
+            {},
+        ),
+        make_claim(
+            "clm-mtg0156-002",
+            [ClaimType.GOVERNMENT_AFFILIATION],
+            "Ask about our government-backed programs, including FHA and VA loan options, "
+            "on a $400,000 loan amount.",
+            "body line under the fixed-rate claim",
             ev,
             {},
         ),
@@ -523,7 +553,7 @@ def mortgage_claims() -> list[Claim]:
 # Real committed evidence PNGs (agent4/screenshot-renders) — deterministic inputs.
 EVIDENCE = {
     "compliant_pl": FIXTURES_DIR / "mock_pl_card_compliant.png",
-    "cc_intro": FIXTURES_DIR / "mock_cc_card_intro_violations.png",
+    "cc_net_impression": FIXTURES_DIR / "mock_cc_card_net_impression.png",
     "preapproved": FIXTURES_DIR / "mock_pl_card_preapproved_guaranteed.png",
-    "mortgage": FIXTURES_DIR / "mock_mtg_arm_as_fixed.png",
+    "mortgage": FIXTURES_DIR / "mock_lt_mtg_preapproved_gov.png",
 }

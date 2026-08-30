@@ -3,6 +3,12 @@ against exactly the mortgage-scoped llm_judged rules — MTG-JUDGE-001 plus the
 three cross-product expansions carrying the mortgage product (rulebook README:
 cross-product rules are pre-expanded per product, XP-<FAMILY>-<NNN>-<product>)
 — and never against deterministic rules or other products' llm_judged rules.
+
+The scenario is SUB-2026-0156 / mock_lt_mtg_preapproved_gov, the fixture set's
+violating mortgage creative (approval-certainty, government-program framing,
+ARM described as fixed). What the judge is SHOWN comes from that mock; what it
+RETURNS is scripted by the fake client, so these tests are about scoping and
+severity resolution, not about which rule the model happens to pick.
 """
 
 from __future__ import annotations
