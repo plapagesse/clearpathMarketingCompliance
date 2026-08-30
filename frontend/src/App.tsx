@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import './shell.css'
 import InputView from './InputView'
-import QueueView from './QueueView'
+import ReviewQueue from './ReviewQueue'
 import RulebookView from './RulebookView'
 
-type View = 'inputs' | 'queue' | 'rulebook'
+type View = 'inputs' | 'rulebook' | 'queue'
 
+// The order the work happens in: the inputs arrive, the rulebook says what they
+// are judged against, and the queue is where a person judges them.
 const TABS: { id: View; label: string }[] = [
   { id: 'inputs', label: 'Inputs' },
-  { id: 'queue', label: 'Queue' },
   { id: 'rulebook', label: 'Rulebook' },
+  { id: 'queue', label: 'Review Queue' },
 ]
 
 function App() {
@@ -58,8 +60,8 @@ function App() {
         </button>
       </nav>
       {view === 'inputs' && <InputView />}
-      {view === 'queue' && <QueueView />}
       {view === 'rulebook' && <RulebookView />}
+      {view === 'queue' && <ReviewQueue onGoToInputs={() => setView('inputs')} />}
     </>
   )
 }

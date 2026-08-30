@@ -346,6 +346,62 @@
   margin: 0;
 }
 
+/* --- decision ---
+   Part of the detail view, so unscoped like the rest of it: the same Approve /
+   Reject pair appears whether the reviewer got here from the grid or the queue. */
+
+.note {
+  font: inherit;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #c7ccd1;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c1e21;
+  box-sizing: border-box;
+}
+
+.decide-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.decide-actions button {
+  font: inherit;
+  padding: 0.4rem 1rem;
+  border: 1px solid #c7ccd1;
+  border-radius: 4px;
+  background: #f5f6f7;
+  color: #1c1e21;
+  cursor: pointer;
+}
+
+.decide-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.decide-actions .approve {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+  color: #245c31;
+}
+
+.decide-actions .reject {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+.decide-actions .linkish {
+  border: none;
+  background: none;
+  color: #33506f;
+  text-decoration: underline;
+}
+
 @media (max-width: 900px) {
   .detail {
     flex-direction: column;

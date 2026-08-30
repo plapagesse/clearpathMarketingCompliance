@@ -170,6 +170,44 @@ def test_list_carries_the_same_ai_summary_the_queue_items_have(client):
         assert queue_item[key] == processed[key]
 
 
+def test_list_carries_the_latest_human_verdict(client):
+    """UI iteration 2: the grid's second chip — has a person signed this off?
+
+    The queue drops a submission the moment it is decided, so this list is the
+    only place the answer stays visible; the fields have to survive the decision
+    rather than disappear with the item.
+    """
+    census = _census()
+    decided_id, untouched_id = sorted(census)[:2]
+
+    before = {r["submission_id"]: r for r in client.get("/api/review/submissions").get_json()}
+    assert {r["human_status"] for r in before.values()} == {"none"}
+    assert before[decided_id]["decided_by"] is None
+    assert before[decided_id]["decided_at"] is None
+
+    posted = client.post(
+        f"/api/queue/submission/{decided_id}/decision",
+        json={"decision": "approved", "decided_by": "dana"},
+    )
+    assert posted.status_code == 200
+
+    after = {r["submission_id"]: r for r in client.get("/api/review/submissions").get_json()}
+
+    # The whole census is still listed — one decision colours one card.
+    assert set(after) == set(census)
+    assert {sid for sid, r in after.items() if r["human_status"] != "none"} == {decided_id}
+    assert after[decided_id]["human_status"] == "approved"
+    assert after[decided_id]["decided_by"] == "dana"
+    assert after[decided_id]["decided_at"] is not None
+    assert after[untouched_id]["human_status"] == "none"
+
+    # And the detail payload the card opens into agrees field for field, because
+    # both go through common.human_summary().
+    detail = client.get("/api/queue/submission/" + decided_id).get_json()
+    for key in ("human_status", "decided_by", "decided_at"):
+        assert detail[key] == after[decided_id][key]
+
+
 def _ids(client, query: str = "") -> set[str]:
     return {r["submission_id"] for r in client.get("/api/review/submissions" + query).get_json()}
 

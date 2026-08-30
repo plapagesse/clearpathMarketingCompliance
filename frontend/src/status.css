@@ -1,7 +1,11 @@
-/* The AI-status chip. Unscoped on purpose: the same chip appears on an input
-   card and in the queue's header, and it has to look the same in both. */
+/* The status chips — what the AI made of a submission, and what a person did
+   about it. Unscoped on purpose: the same pair appears on an input card and in
+   the detail view's header, and they have to look the same in both.
 
-.ai-chip {
+   Same geometry for both, because they sit side by side and read as one row. */
+
+.ai-chip,
+.human-chip {
   display: inline-block;
   border: 1px solid;
   border-radius: 3px;
@@ -40,4 +44,24 @@
   background: #eef2f7;
   border-color: #b8c6d8;
   color: #33506f;
+}
+
+/* --- the human verdict --- */
+
+.human-chip-none {
+  background: #f0f0f0;
+  border-color: #ccc;
+  color: #555;
+}
+
+.human-chip-approved {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+  color: #245c31;
+}
+
+.human-chip-rejected {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
 }

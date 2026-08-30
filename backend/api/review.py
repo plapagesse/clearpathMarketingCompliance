@@ -7,9 +7,10 @@ Four endpoints, all thin wrappers over the seeded submissions table:
   POST /api/review/reset                  demo only: reseed from fixtures/, wipe uploads
                                           (404 unless CLEARPATH_DEMO or debug)
 
-Every listed card carries the same AI-status summary the queue items do (see
-backend/api/common.py), so a reviewer can tell at a glance which inputs the
-engine has already looked at without opening them one by one.
+Every listed card carries the same AI-status summary the queue items do, plus the
+latest human verdict (see backend/api/common.py), so a reviewer can tell at a
+glance which inputs the engine has already looked at — and which a person has
+already signed off on — without opening them one by one.
 
 Seeding is unchanged (``python -m backend.db.seed``); this module only makes
 sure the tables exist so a fresh checkout answers instead of 500-ing.
@@ -30,6 +31,7 @@ from backend.api.common import (
     ai_summary,
     days_ago,
     filter_by_input_type,
+    human_summary,
     input_type,
     open_session,
 )
@@ -69,6 +71,7 @@ def _serialize(session, row: SubmissionRow) -> dict:
         "input_type": input_type(row.mode),
     }
     card.update(ai_summary(session, row))
+    card.update(human_summary(session, row))
     return card
 
 

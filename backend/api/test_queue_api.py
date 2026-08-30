@@ -178,6 +178,57 @@ def test_queue_filters_by_input_type(client):
     assert client.get("/api/queue?input_type=banana").status_code == 400
 
 
+def test_queue_filters_by_ai_status(client):
+    """UI iteration 2: the queue takes the input grid's fourth selector too.
+
+    One submission per bucket, so the four settings partition the backlog — the
+    reviewer can scope the cycle to "only the ones the AI flagged" and reach
+    every other card by exactly one other setting.
+    """
+    _add_submission("SUB-ISSUES", None, date_submitted=date(2026, 8, 20))
+    _add_submission("SUB-REVIEW", None, date_submitted=date(2026, 8, 21))
+    _add_submission("SUB-CLEAN", None, date_submitted=date(2026, 8, 22))
+    _add_submission("SUB-RAW", None, date_submitted=date(2026, 8, 23))
+    _add_check_run("SUB-ISSUES", [("R1", "high")], run_id="cr-issues")
+    _add_check_run("SUB-REVIEW", [("R1", "medium")], run_id="cr-review")
+    _add_check_run("SUB-CLEAN", [("R1", "info")], run_id="cr-clean")
+
+    def ids(query: str) -> list[str]:
+        return [i["submission_id"] for i in client.get("/api/queue" + query).get_json()["items"]]
+
+    assert ids("?ai_status=issues") == ["SUB-ISSUES"]
+    assert ids("?ai_status=review") == ["SUB-REVIEW"]
+    assert ids("?ai_status=clean") == ["SUB-CLEAN"]
+    assert ids("?ai_status=not_checked") == ["SUB-RAW"]
+    assert ids("?ai_status=") == ["SUB-ISSUES", "SUB-REVIEW", "SUB-CLEAN", "SUB-RAW"]
+
+    # `remaining` counts the scoped cycle, not the whole backlog — the header and
+    # the list the reviewer walks have to be the same set.
+    assert client.get("/api/queue?ai_status=issues").get_json()["remaining"] == 1
+
+    # Same closed-vocabulary contract as input_type and as /api/review's copy of
+    # this filter: a typo is a 400, not a silently unfiltered queue.
+    assert client.get("/api/queue?ai_status=banana").status_code == 400
+
+
+def test_queue_ai_status_composes_with_the_other_selectors(client):
+    """ai_status narrows what the other three already scoped, not the whole table."""
+    _add_submission("SUB-CK", None, partner="credit_karma")
+    _add_submission("SUB-NW", None, partner="nerdwallet", date_submitted=date(2026, 8, 21))
+    _add_check_run("SUB-CK", [("R1", "critical")], run_id="cr-ck")
+    _add_check_run("SUB-NW", [("R1", "critical")], run_id="cr-nw")
+
+    body = client.get("/api/queue?ai_status=issues&partner=credit_karma").get_json()
+    assert [i["submission_id"] for i in body["items"]] == ["SUB-CK"]
+    assert body["remaining"] == 1
+
+    # A partner with nothing in that bucket comes back empty rather than falling
+    # through to the unfiltered queue.
+    empty = client.get("/api/queue?ai_status=clean&partner=credit_karma").get_json()
+    assert empty["items"] == []
+    assert empty["remaining"] == 0
+
+
 def test_item_reports_input_type_days_left_and_image_url(client):
     due = date.today() + timedelta(days=3)
     _add_submission("SUB-PROPOSED", due, date_submitted=date(2026, 8, 20))
@@ -245,6 +296,79 @@ def test_decision_removes_item_from_queue(client):
     body = client.get("/api/queue").get_json()
     assert body["remaining"] == 1
     assert [i["submission_id"] for i in body["items"]] == ["SUB-2"]
+
+
+def test_queue_items_report_the_human_verdict_as_undecided(client):
+    """GET /api/queue is undecided-only, so its items say so in the payload too.
+
+    The fields are always present rather than omitted the way the AI ones are:
+    "nobody has decided" is a state the chip renders, not an absence.
+    """
+    _add_submission("SUB-1", date(2026, 8, 29))
+
+    item = client.get("/api/queue").get_json()["items"][0]
+
+    assert item["human_status"] == "none"
+    assert item["decided_by"] is None
+    assert item["decided_at"] is None
+
+
+@pytest.mark.parametrize("verdict", ["approved", "rejected"])
+def test_human_status_goes_from_none_to_the_recorded_decision(client, verdict):
+    """The detail view's second chip, across the transition that sets it."""
+    _add_submission("SUB-H", date(2026, 8, 29))
+
+    before = client.get("/api/queue/submission/SUB-H").get_json()
+    assert before["human_status"] == "none"
+    assert before["decided_by"] is None
+    assert before["decided_at"] is None
+
+    posted = client.post(
+        "/api/queue/submission/SUB-H/decision",
+        json={"decision": verdict, "decided_by": "dana", "note": "checked the APR"},
+    )
+    assert posted.status_code == 200
+    assert posted.get_json()["human_status"] == verdict
+
+    after = client.get("/api/queue/submission/SUB-H").get_json()
+    assert after["human_status"] == verdict
+    assert after["decided_by"] == "dana"
+    assert after["decided_at"] is not None
+
+    # The other half of what the chip means: the submission has left the cycle.
+    assert client.get("/api/queue").get_json()["remaining"] == 0
+
+
+def test_human_status_reports_the_latest_decision(client):
+    """A reviewer who changes their mind writes a second row; the chip follows it."""
+    _add_submission("SUB-M", date(2026, 8, 29))
+    client.post(
+        "/api/queue/submission/SUB-M/decision",
+        json={"decision": "approved", "decided_by": "dana"},
+    )
+
+    # Age the first decision, so "latest" is settled by the timestamp rather than
+    # by two rows happening to land in insertion order.
+    from backend.db.models import ReviewDecisionRow
+
+    session = _session()
+    try:
+        session.query(ReviewDecisionRow).one().decided_at = datetime(
+            2026, 8, 1, tzinfo=timezone.utc
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    client.post(
+        "/api/queue/submission/SUB-M/decision",
+        json={"decision": "rejected", "decided_by": "sam"},
+    )
+
+    body = client.get("/api/queue/submission/SUB-M").get_json()
+
+    assert body["human_status"] == "rejected"
+    assert body["decided_by"] == "sam"
 
 
 def test_decision_rejects_unknown_verdict(client):

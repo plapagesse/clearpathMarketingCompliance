@@ -3,7 +3,10 @@
 One submission at a time, oldest first — the queue is worked in arrival order,
 so the longest-waiting partner is never the last one looked at. A submission
 leaves the queue the moment a ReviewDecisionRow exists for it, so `remaining` is
-the honest count of what is still on the reviewer's plate.
+the honest count of what is still on the reviewer's plate. GET /api/queue stays
+undecided-only for that reason; the human verdict fields it carries alongside
+(human_status / decided_by / decided_at) are there for the detail payload, which
+is served by the same serializer and is reached for decided submissions too.
 
 Screenshots are served by the input view's /api/review/evidence/<file> route;
 this module only resolves the on-disk path when it needs to feed the engine.
@@ -21,9 +24,11 @@ from sqlalchemy import select
 
 from backend.api.common import (
     SEVERITY_RANK,
+    ai_status_filter,
     ai_summary,
     days_ago,
     filter_by_input_type,
+    human_summary,
     input_type,
     latest_check_run,
 )
@@ -101,6 +106,10 @@ def _item(session, sub: SubmissionRow) -> dict:
         "input_type": input_type(sub.mode),
     }
     item.update(ai_summary(session, sub))
+    # Always "none" for an item served by GET /api/queue, which is undecided-only
+    # by definition — but the detail and decision payloads share this serializer,
+    # and there the human verdict is the whole point.
+    item.update(human_summary(session, sub))
     return item
 
 
@@ -123,10 +132,18 @@ def _decided_ids(session) -> list[str]:
 
 @queue_bp.get("")
 def queue():
-    """Undecided submissions for a product/partner/input-type combo, oldest first."""
+    """Undecided submissions for a product/partner/input-type/ai-status combo, oldest first.
+
+    The four params are the queue's cycle set: exactly the selectors the input
+    grid offers, so "scoped to credit_karma mortgages the AI flagged" means the
+    same thing whichever view the reviewer sets it from. ai_status is applied to
+    the serialized cards for the reason review.py's is — the bucket is a property
+    of the latest CheckRun, which only exists once ai_summary() has run.
+    """
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
     wanted_type = (request.args.get("input_type") or "").strip()
+    wanted_ai = (request.args.get("ai_status") or "").strip()
 
     session = get_session()
     try:
@@ -137,6 +154,7 @@ def queue():
             stmt = stmt.where(SubmissionRow.partner == partner)
         try:
             stmt = filter_by_input_type(stmt, wanted_type)
+            keep = ai_status_filter(wanted_ai)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         decided = _decided_ids(session)
@@ -149,7 +167,9 @@ def queue():
             SubmissionRow.submission_id.asc(),
         )
         subs = list(session.execute(stmt).scalars().all())
-        items = [_item(session, s) for s in subs]
+        # remaining counts what came through the filter, so the header and the
+        # cycle the reviewer is actually walking are the same list.
+        items = [item for item in (_item(session, s) for s in subs) if keep(item)]
         return jsonify({"remaining": len(items), "items": items})
     finally:
         session.close()

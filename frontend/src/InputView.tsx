@@ -1,48 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
 import './status.css'
-import { FindingsPanel, HistoryList, type Finding, type HistoryEvent } from './FindingsPanel'
-import { ageText, aiChip, CHECKING_CHIP } from './format'
-
-type SubmissionCard = {
-  submission_id: string
-  product: string
-  partner: string
-  surface: string
-  mode: string
-  date_submitted: string | null
-  days_ago: number | null
-  sla_due: string | null
-  image_url: string | null
-  input_type: string
-  ai_status: string
-  attention?: string
-  max_severity?: string | null
-  findings_count?: number
-}
-
-/** GET /api/queue/submission/<id> — the queue's detail payload, reused verbatim. */
-type Detail = SubmissionCard & {
-  proposed_headline?: string
-  findings?: Finding[]
-  history?: HistoryEvent[]
-}
-
-const PRODUCTS = [
-  { value: 'personal_loan', label: 'Personal loan' },
-  { value: 'credit_card', label: 'Credit card' },
-  { value: 'mortgage_prequal', label: 'Mortgage prequal' },
-]
-
-// The AI-status selector's buckets. Values are the server's closed vocabulary;
-// labels repeat the chip wording, so filtering by "AI: issues" picks out exactly
-// the cards wearing that chip.
-const AI_STATUSES = [
-  { value: 'not_checked', label: 'Not checked' },
-  { value: 'clean', label: 'AI: clean' },
-  { value: 'review', label: 'AI: review' },
-  { value: 'issues', label: 'AI: issues' },
-]
+import { AI_STATUSES, INPUT_TYPES, PRODUCTS } from './filters'
+import { ageText, aiChip, humanChip, CHECKING_CHIP } from './format'
+import SubmissionDetail, { type SubmissionCard } from './SubmissionDetail'
 
 /** The AI fields a /process response carries back onto the card it belongs to. */
 function aiFields(item: SubmissionCard) {
@@ -79,11 +40,9 @@ function InputView() {
   const [running, setRunning] = useState(false)
   const [batchNote, setBatchNote] = useState('')
 
-  // Individual input view — a conditional render, not a route.
+  // The individual input — a conditional render, not a route. The view itself is
+  // SubmissionDetail, the same component the Review Queue cycles through.
   const [openId, setOpenId] = useState('')
-  const [detail, setDetail] = useState<Detail | null>(null)
-  const [detailError, setDetailError] = useState('')
-  const [processing, setProcessing] = useState(false)
 
   const open = cards.find((c) => c.submission_id === openId) || null
 
@@ -115,19 +74,6 @@ function InputView() {
   }
 
   useEffect(load, [product, partner, inputType, aiStatus])
-
-  useEffect(() => {
-    if (!openId) {
-      setDetail(null)
-      return
-    }
-    setDetail(null)
-    setDetailError('')
-    fetch('/api/queue/submission/' + openId)
-      .then((r) => r.json())
-      .then(setDetail)
-      .catch(() => setDetailError('Could not load ' + openId + '.'))
-  }, [openId])
 
   function toggleSelected(id: string) {
     setBatchNote('')
@@ -209,23 +155,9 @@ function InputView() {
     )
   }
 
-  /** Run the AI on the one submission the detail section is showing. */
-  function processOpen() {
-    setProcessing(true)
-    setDetailError('')
-    fetch('/api/queue/submission/' + openId + '/process', { method: 'POST' })
-      .then((r) => r.json().then((body) => ({ ok: r.ok, body })))
-      .then(({ ok, body }) => {
-        if (!ok) throw new Error(body.error || 'processing failed')
-        setCards((all) =>
-          all.map((c) => (c.submission_id === openId ? { ...c, ...aiFields(body) } : c)),
-        )
-        return fetch('/api/queue/submission/' + openId)
-          .then((r) => r.json())
-          .then(setDetail)
-      })
-      .catch((e: Error) => setDetailError('AI review failed: ' + e.message))
-      .then(() => setProcessing(false))
+  /** Fold one submission's fresh fields back into the grid behind the detail view. */
+  function patchCard(id: string, fields: Partial<SubmissionCard>) {
+    setCards((all) => all.map((c) => (c.submission_id === id ? { ...c, ...fields } : c)))
   }
 
   function openForm() {
@@ -267,8 +199,6 @@ function InputView() {
   // --- individual input ---------------------------------------------------- //
 
   if (open) {
-    const shown: Detail = { ...open, ...(detail || {}) }
-    const chip = aiChip(shown)
     return (
       <main className="page">
         <div className="topbar">
@@ -277,71 +207,15 @@ function InputView() {
           </button>
         </div>
 
-        <div className="detail">
-          <div className="detail-shot">
-            {shown.image_url ? (
-              <img src={shown.image_url} alt={shown.submission_id} />
-            ) : (
-              <p className="empty">No screenshot on file.</p>
-            )}
-          </div>
-
-          <div className="detail-side">
-            <div className="detail-head">
-              <h1>{shown.submission_id}</h1>
-              <span className={'badge badge-' + shown.input_type}>
-                {shown.input_type === 'production' ? 'Production' : 'Proposed'}
-              </span>
-              <span className={chip.className}>{chip.label}</span>
-            </div>
-            <p className="sla">{ageText(shown.days_ago)}</p>
-
-            <dl className="meta">
-              <dt>Product</dt>
-              <dd>{shown.product}</dd>
-              <dt>Partner</dt>
-              <dd>{shown.partner}</dd>
-              <dt>Surface</dt>
-              <dd>{shown.surface}</dd>
-              <dt>Submitted</dt>
-              <dd>{shown.date_submitted || '—'}</dd>
-              <dt>SLA due</dt>
-              <dd>{shown.sla_due || '—'}</dd>
-              {shown.proposed_headline && (
-                <>
-                  <dt>Headline</dt>
-                  <dd>{shown.proposed_headline}</dd>
-                </>
-              )}
-            </dl>
-
-            {detailError && <p className="error">{detailError}</p>}
-
-            <div className="detail-block">
-              <h2>AI review</h2>
-              {shown.ai_status === 'unprocessed' ? (
-                <>
-                  <p className="empty">This input has not been checked yet.</p>
-                  <button className="run-button" onClick={processOpen} disabled={processing}>
-                    {processing ? 'Processing…' : 'Run AI review'}
-                  </button>
-                  {processing && <p className="empty">This takes 15–40 seconds.</p>}
-                </>
-              ) : (
-                <FindingsPanel
-                  attention={shown.attention}
-                  findingsCount={shown.findings_count}
-                  findings={detail?.findings}
-                />
-              )}
-            </div>
-
-            <div className="detail-block">
-              <h2>History</h2>
-              <HistoryList history={detail?.history} />
-            </div>
-          </div>
-        </div>
+        <SubmissionDetail
+          key={open.submission_id}
+          submissionId={open.submission_id}
+          seed={open}
+          onProcessed={(card) => patchCard(open.submission_id, aiFields(card))}
+          // No auto-advance here: this flow is "open one input, look at it".
+          // The detail refreshes itself; the grid behind it gets the new chip.
+          onDecided={(decision) => patchCard(open.submission_id, { human_status: decision })}
+        />
       </main>
     )
   }
@@ -351,7 +225,9 @@ function InputView() {
   return (
     <main className="page">
       <div className="topbar">
-        <h1>Review queue</h1>
+        {/* "Inputs", not "Review queue": the queue is its own tab now, and it is
+            a cycle through these same submissions rather than this grid. */}
+        <h1>Inputs</h1>
 
         <label className="filter">
           Product
@@ -381,8 +257,11 @@ function InputView() {
           Input type
           <select value={inputType} onChange={(e) => setInputType(e.target.value)}>
             <option value="">All input types</option>
-            <option value="proposed">Proposed</option>
-            <option value="production">Production</option>
+            {INPUT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -493,6 +372,7 @@ function InputView() {
       <div className="grid">
         {cards.map((card) => {
           const chip = busyIds.includes(card.submission_id) ? CHECKING_CHIP : aiChip(card)
+          const human = humanChip(card)
           return (
             <div
               className="card"
@@ -518,6 +398,7 @@ function InputView() {
                   {card.input_type === 'production' ? 'Production' : 'Proposed'}
                 </span>
                 <span className={chip.className}>{chip.label}</span>
+                <span className={human.className}>{human.label}</span>
               </div>
               <div className="card-surface">{card.surface}</div>
               <div className="sla">{ageText(card.days_ago)}</div>

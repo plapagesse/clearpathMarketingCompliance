@@ -1,14 +1,18 @@
 // Tiny display helpers shared by the input grid and the queue.
 //
-// Both views show how long a submission has been waiting and what the AI made
-// of it. Those two sentences live here so the two views can never word them
-// differently — a card in the grid and the same submission in the queue read
-// identically.
+// Both views show how long a submission has been waiting, what the AI made of
+// it, and whether a person has signed off. Those sentences live here so the two
+// views can never word them differently — a card in the grid and the same
+// submission in the detail view read identically.
 
 export type AiSummary = {
   ai_status?: string
   attention?: string
   findings_count?: number
+}
+
+export type HumanSummary = {
+  human_status?: string
 }
 
 /** "added 3d ago" from the server's days_ago. */
@@ -37,3 +41,21 @@ export function aiChip(item: AiSummary | null | undefined): Chip {
 
 /** Shown on a card while its own AI review is in flight. */
 export const CHECKING_CHIP: Chip = { label: 'Checking…', className: 'ai-chip ai-chip-busy' }
+
+const HUMAN_CHIPS: Record<string, Chip> = {
+  approved: { label: 'Human: approved', className: 'human-chip human-chip-approved' },
+  rejected: { label: 'Human: rejected', className: 'human-chip human-chip-rejected' },
+}
+
+/** The companion to aiChip: has a person signed this off, and which way?
+ *
+ * Grey em-dash until someone decides, then green or red. The server always
+ * sends human_status, so an undecided submission is a state here, not a gap. */
+export function humanChip(item: HumanSummary | null | undefined): Chip {
+  return (
+    HUMAN_CHIPS[item?.human_status || 'none'] || {
+      label: 'Human: —',
+      className: 'human-chip human-chip-none',
+    }
+  )
+}

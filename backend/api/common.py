@@ -6,7 +6,11 @@ puts the same chip on every card, so the logic lives here and both blueprints
 call it: one definition of "what the AI thinks of this submission", so the two
 views can never disagree.
 
-Age and input-type live here for the same reason — both lists show them.
+The human verdict (human_status / decided_by / decided_at) is here for the same
+reason: the input grid, the review list and the detail view all wear the chip
+that says whether a person has signed off, and one query answers all three.
+
+Age and input-type live here too — both lists show them.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.db.models import CheckRunRow, SubmissionRow
+from backend.db.models import CheckRunRow, ReviewDecisionRow, SubmissionRow
 from backend.db.session import get_session, init_db
 
 # Rank severities so "the worst finding in the run" is a max(), not a lookup table.
@@ -129,4 +133,32 @@ def ai_summary(session: Session, sub: SubmissionRow) -> dict:
         "findings_count": len(severities),
         "attention": attention(severities),
         "latest_check_run_id": run.id,
+    }
+
+
+def latest_decision(session: Session, sub: SubmissionRow) -> ReviewDecisionRow | None:
+    """The reviewer's most recent call on this submission, if anyone has made one."""
+    return session.execute(
+        select(ReviewDecisionRow)
+        .where(ReviewDecisionRow.submission_id == sub.id)
+        .order_by(ReviewDecisionRow.decided_at.desc(), ReviewDecisionRow.id.desc())
+        .limit(1)
+    ).scalars().first()
+
+
+def human_summary(session: Session, sub: SubmissionRow) -> dict:
+    """The human-verdict block, alongside ai_summary's.
+
+    Unlike ai_summary, the fields are always present: "none" is a state the chip
+    renders ("Human: —"), not an absence, and a caller sorting or filtering on
+    human_status should never have to guess whether a missing key means
+    undecided or means the server forgot.
+    """
+    row = latest_decision(session, sub)
+    if row is None:
+        return {"human_status": "none", "decided_by": None, "decided_at": None}
+    return {
+        "human_status": row.decision,
+        "decided_by": row.decided_by,
+        "decided_at": row.decided_at.isoformat() if row.decided_at else None,
     }
