@@ -120,6 +120,14 @@ function InputView() {
     setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.concat(id)))
   }
 
+  // "All" means every card the current filter is showing, not every row in the DB.
+  const allSelected = cards.length > 0 && cards.every((c) => selected.includes(c.submission_id))
+
+  function toggleSelectAll() {
+    setBatchNote('')
+    setSelected(allSelected ? [] : cards.map((c) => c.submission_id))
+  }
+
   /** One POST per selected card, in order. A failure is counted, not fatal. */
   async function runBatch() {
     const ids = selected
@@ -393,14 +401,21 @@ function InputView() {
         </div>
       )}
 
-      {selected.length > 0 && (
+      {cards.length > 0 && (
         <div className="batch-bar">
-          <button className="run-button" onClick={runBatch} disabled={running}>
-            {running ? 'Running AI review…' : `Run AI review on ${selected.length} selected`}
+          <button className="linkish" onClick={toggleSelectAll} disabled={running}>
+            {allSelected ? 'Deselect all' : 'Select all'}
           </button>
-          <button className="linkish" onClick={() => setSelected([])} disabled={running}>
-            Clear selection
-          </button>
+          {selected.length > 0 && (
+            <>
+              <button className="run-button" onClick={runBatch} disabled={running}>
+                {running ? 'Running AI review…' : `Run AI review on ${selected.length} selected`}
+              </button>
+              <button className="linkish" onClick={() => setSelected([])} disabled={running}>
+                Clear selection
+              </button>
+            </>
+          )}
         </div>
       )}
 
