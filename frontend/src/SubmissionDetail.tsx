@@ -64,6 +64,12 @@ function SubmissionDetail({ submissionId, seed, onProcessed, onDecided, onSkip }
   // Bumped by anything that changes the submission server-side, to refetch it.
   const [reload, setReload] = useState(0)
 
+  // Advancing through the queue reuses the page scroll position of the previous
+  // item; a new submission should always be read from its top.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [submissionId])
+
   // One mount per submission — callers key this component on the id, so a new
   // submission arrives as a fresh instance rather than as a prop change this
   // has to unpick. Nothing here needs to reset the note or the findings.
