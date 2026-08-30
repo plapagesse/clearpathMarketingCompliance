@@ -8,7 +8,7 @@ Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inlin
 - `validate_fixtures.py` — enforces the invariants above (coverage, manifest/mode agreement, literal claim_text, location_note presence, compliant-fixture emptiness). Run `python3 fixtures/validate_fixtures.py`; exit 0 = pass.
 - `*.png` — **the canonical evidence artifacts: the platform ingests screenshots (images), and these committed renders are the deterministic eval inputs.** Each is rendered from its same-basename HTML at 600x1200 via headless Chrome.
 - `*.html` — the SOURCE files that generate the PNGs (edit these, then re-render). HTML comments (the planted-violation annotations) never render, so the PNGs are clean-room eval inputs by construction — no comment-stripping needed.
-- `render_screenshots.py` — regenerates all PNGs: `python3 fixtures/render_screenshots.py` (requires Google Chrome at the standard macOS path).
+- `render_screenshots.py` — regenerates all PNGs: `python3 fixtures/render_screenshots.py` (requires Google Chrome at the standard macOS path). Pass explicit paths to render ad-hoc fixtures instead of the default glob: `python3 fixtures/render_screenshots.py canary.html ...` — the PNG lands next to each source.
 
 ## Inventory
 
