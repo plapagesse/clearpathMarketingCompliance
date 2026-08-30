@@ -244,7 +244,13 @@ def test_eval_dry_run_to_api_boundary(tmp_path, monkeypatch):
     monkeypatch.setattr(ev, "REPORT_PATH", tmp_path / "report.json")
     report = ev.run_eval()
     assert report["evidence_format"] == "png"
-    assert len(report["per_mock"]) == 10
+    # One row per mock in the answer key the harness was pointed at — derived,
+    # not a literal, so growing the fixture set cannot strand this assertion.
+    expected_mocks = [
+        k for k in json.loads((fx / "expected_findings.json").read_text()) if not k.startswith("_")
+    ]
+    assert len(report["per_mock"]) == len(expected_mocks)
+    assert {m["mock"] for m in report["per_mock"]} == set(expected_mocks)
     assert (tmp_path / "report.json").exists()
     # with a canned single-claim response, misses must carry diagnostics
     miss_rows = [r for m in report["per_mock"] for r in m["detail"] if not r["matched"]]

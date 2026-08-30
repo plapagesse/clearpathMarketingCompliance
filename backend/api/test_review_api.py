@@ -5,9 +5,44 @@ from pathlib import Path
 import pytest
 
 from backend.db.seed import seed
+from backend.ingest import load_submissions
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = REPO_ROOT / "fixtures"
+SUBMISSIONS_CSV = FIXTURES_DIR / "submissions.csv"
+
+
+# --------------------------------------------------------------------------- #
+# Census-robust expectations
+#
+# These tests seed from fixtures/, so the fixture manifest IS the ground truth
+# for what the endpoint must return. Deriving expectations by parsing it — the
+# same parser the seeder uses — instead of hard-coding ids and counts means the
+# fixture set can grow without the tests going stale. (It went 10 -> 16 when the
+# nerdwallet and lendingtree partner mocks landed, which is what stranded the
+# literals that used to live here.)
+# --------------------------------------------------------------------------- #
+
+
+def _census():
+    """Every submission the seeder will load, keyed by submission_id."""
+    return {s.submission_id: s for s in load_submissions(SUBMISSIONS_CSV)}
+
+
+def _input_type_of(sub) -> str:
+    """Mirrors the API's mapping: verification is 'production', all else 'proposed'."""
+    return "production" if sub.mode.value == "verification" else "proposed"
+
+
+def _expected_ids(product: str = "", partner: str = "", input_type: str = "") -> set[str]:
+    """The ids the endpoint owes us for a filter combination, per the manifest."""
+    return {
+        sid
+        for sid, sub in _census().items()
+        if (not product or sub.product.value == product)
+        and (not partner or sub.partner == partner)
+        and (not input_type or _input_type_of(sub) == input_type)
+    }
 
 
 @pytest.fixture()
@@ -66,19 +101,31 @@ def _add_check_run(submission_id: str, severities: list[str], run_id: str = "cr-
 
 
 def test_list_returns_seeded_submissions(client):
+    """The endpoint returns the seeded census, and each row reports its own row."""
+    census = _census()
     rows = client.get("/api/review/submissions").get_json()
-    assert len(rows) == 10
     by_id = {r["submission_id"]: r for r in rows}
 
-    pre_pub = by_id["SUB-2026-0142"]
-    assert pre_pub["partner"] == "credit_karma"
-    assert pre_pub["product"] == "personal_loan"
-    assert pre_pub["input_type"] == "proposed"
-    assert pre_pub["sla_due"] == "2026-08-29"
-    # image_url points at the PNG asset, not the sibling HTML
-    assert pre_pub["image_url"] == "/api/review/evidence/mock_pl_card_compliant.png"
+    assert set(by_id) == set(census)
 
-    assert by_id["SUB-2026-0151"]["input_type"] == "production"
+    # Every row's own fields agree with the manifest row it came from — a
+    # relation that holds however many fixtures there are.
+    for sid, row in by_id.items():
+        sub = census[sid]
+        assert row["partner"] == sub.partner
+        assert row["product"] == sub.product.value
+        assert row["input_type"] == _input_type_of(sub)
+        assert row["date_submitted"] == sub.date_submitted.isoformat()
+        assert row["sla_due"] == (sub.sla_due.isoformat() if sub.sla_due else None)
+
+    # image_url points at the PNG asset, never the sibling HTML.
+    for sid, row in by_id.items():
+        pngs = [f for f in census[sid].asset_files if f.lower().endswith(".png")]
+        if pngs:
+            assert row["image_url"] == f"/api/review/evidence/{pngs[0]}"
+
+    # Both input types are actually represented, so the mapping is exercised.
+    assert {row["input_type"] for row in rows} == {"proposed", "production"}
 
 
 def test_list_is_oldest_first_and_reports_age(client):
@@ -87,7 +134,9 @@ def test_list_is_oldest_first_and_reports_age(client):
 
     dates = [r["date_submitted"] for r in rows]
     assert dates == sorted(dates)
-    assert rows[0]["date_submitted"] == "2026-08-24"
+    assert rows[0]["date_submitted"] == min(
+        s.date_submitted for s in _census().values()
+    ).isoformat()
 
     oldest = rows[0]
     expected = (date.today() - date.fromisoformat(oldest["date_submitted"])).days
@@ -96,59 +145,79 @@ def test_list_is_oldest_first_and_reports_age(client):
 
 def test_list_carries_the_same_ai_summary_the_queue_items_have(client):
     """Change #3: every card says whether the AI has looked at it, and how it went."""
-    _add_check_run("SUB-2026-0142", ["low", "critical"])
+    # Two arbitrary seeded submissions, taken from the manifest rather than
+    # named, for the same reason the filter tests derive their expectations.
+    checked_id, untouched_id = sorted(_census())[:2]
+    _add_check_run(checked_id, ["low", "critical"])
 
     by_id = {r["submission_id"]: r for r in client.get("/api/review/submissions").get_json()}
 
-    processed = by_id["SUB-2026-0142"]
+    processed = by_id[checked_id]
     assert processed["ai_status"] == "processed"
     assert processed["attention"] == "high_attention"
     assert processed["max_severity"] == "critical"
     assert processed["findings_count"] == 2
     assert processed["latest_check_run_id"] == "cr-review-test"
 
-    untouched = by_id["SUB-2026-0143"]
+    untouched = by_id[untouched_id]
     assert untouched["ai_status"] == "unprocessed"
     assert "attention" not in untouched
     assert "max_severity" not in untouched
 
     # The queue's item for the same submission agrees field for field.
-    queue_item = client.get("/api/queue/submission/SUB-2026-0142").get_json()
+    queue_item = client.get("/api/queue/submission/" + checked_id).get_json()
     for key in ("ai_status", "attention", "max_severity", "findings_count", "latest_check_run_id"):
         assert queue_item[key] == processed[key]
 
 
 def test_list_filters_by_input_type(client):
-    proposed = client.get("/api/review/submissions?input_type=proposed").get_json()
-    production = client.get("/api/review/submissions?input_type=production").get_json()
+    for wanted in ("proposed", "production"):
+        rows = client.get(f"/api/review/submissions?input_type={wanted}").get_json()
+        expected = _expected_ids(input_type=wanted)
 
-    assert {r["submission_id"] for r in production} == {"SUB-2026-0151"}
-    assert len(proposed) == 9
-    assert all(r["input_type"] == "proposed" for r in proposed)
-    # combines with the other two selectors
+        assert expected, f"the fixture set has no {wanted} submissions to filter for"
+        assert {r["submission_id"] for r in rows} == expected
+        # the returned rows really are of the requested type
+        assert all(r["input_type"] == wanted for r in rows)
+
+    # The three selectors compose.
+    product = next(
+        s.product.value for s in _census().values() if _input_type_of(s) == "production"
+    )
     combo = client.get(
-        "/api/review/submissions?input_type=production&product=personal_loan"
+        f"/api/review/submissions?input_type=production&product={product}"
     ).get_json()
-    assert [r["submission_id"] for r in combo] == ["SUB-2026-0151"]
+    assert {r["submission_id"] for r in combo} == _expected_ids(
+        product=product, input_type="production"
+    )
 
     assert client.get("/api/review/submissions?input_type=banana").status_code == 400
 
 
 def test_filters_by_product_and_partner(client):
-    cards = client.get("/api/review/submissions?product=credit_card").get_json()
-    assert {r["submission_id"] for r in cards} == {
-        "SUB-2026-0143",
-        "SUB-2026-0144",
-        "SUB-2026-0149",
-    }
+    census = _census()
 
-    assert len(client.get("/api/review/submissions?partner=credit_karma").get_json()) == 10
+    for product in sorted({s.product.value for s in census.values()}):
+        rows = client.get(f"/api/review/submissions?product={product}").get_json()
+        assert {r["submission_id"] for r in rows} == _expected_ids(product=product)
+        assert all(r["product"] == product for r in rows)
+
+    for partner in sorted({s.partner for s in census.values()}):
+        rows = client.get(f"/api/review/submissions?partner={partner}").get_json()
+        assert {r["submission_id"] for r in rows} == _expected_ids(partner=partner)
+        assert all(r["partner"] == partner for r in rows)
+
     assert client.get("/api/review/submissions?partner=nobody").get_json() == []
 
+    # A product/partner pair that the fixture set actually populates.
+    sample = next(iter(census.values()))
     both = client.get(
-        "/api/review/submissions?product=mortgage_prequal&partner=credit_karma"
+        f"/api/review/submissions?product={sample.product.value}&partner={sample.partner}"
     ).get_json()
-    assert {r["submission_id"] for r in both} == {"SUB-2026-0145", "SUB-2026-0150"}
+    assert {r["submission_id"] for r in both} == _expected_ids(
+        product=sample.product.value, partner=sample.partner
+    )
+    assert sample.submission_id in {r["submission_id"] for r in both}
 
 
 def test_post_creates_row_and_saves_file(client, tmp_path):

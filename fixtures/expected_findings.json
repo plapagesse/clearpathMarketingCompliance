@@ -263,6 +263,7 @@
     "submission_id": "SUB-2026-0153",
     "product": "credit_card",
     "mode": "pre_publication",
+    "_withdrawn_note": "A 'promo_terms_vs_offer_matrix' finding expecting CC-TRUTH-001 was planted here and has been WITHDRAWN: the rule cannot fire on this creative. CC-TRUTH-001 is a composite_all of ground_truth_consistency sub-checks, i.e. purely NUMERIC reconciliation of claim payload against the referenced offer cell, and every number this creative states is TRUE of CC-PLAT — 0% intro APR (intro_apr_pct 0.00), '15 billing cycles' (intro_period_months 15), 19.24%–29.24% post-promo (apr_min/apr_max), $0 annual fee (annual_fee 0), and a review date inside effective_start..effective_end. The planted deception is qualitative: 'forever' (a duration no number in the creative contradicts — the correct 15-cycle term is stated one line below) and the purchases-only restriction, which lives only in the offer matrix's free-text `notes` column that no deterministic primitive reads. Absence of a claim field cannot fire the rule either: ground_truth_consistency returns early on 'nothing claimed -> nothing to reconcile'. 'forever' also appears in no lexicon or pattern in rulebook/data/, and no llm_judged credit_card rule covers promo duration/scope (CC-JUDGE-001 is rewards, XP-COMP-003 superlatives, XP-ODDS-005 approval odds, XP-TEST-006 testimonials), so the violation is unreachable in rulebook v2026.08.4 rather than merely mis-attributed. The mock's other two planted violations (CC-INTRO-001, XP-UDAAP-001-credit_card) fire correctly and are unchanged.",
     "expected_findings": [
       {
         "rule_area": "regz_intro_adjacency_open_end",
@@ -278,21 +279,6 @@
         },
         "location_note": "headline; the words 'intro' and 'introductory' appear nowhere in the creative",
         "description": "Promotional rate stated without the term 'intro'/'introductory' in immediate proximity to its listing (Reg Z 1026.16(g)(3)). The post-promo sentence directly below satisfies 1026.16(g)(4) proximity, so CC-INTRO-002 is deliberately NOT planted here — the adjacency failure is isolated."
-      },
-      {
-        "rule_area": "promo_terms_vs_offer_matrix",
-        "check_class": "truthfulness",
-        "severity": "critical",
-        "claim_text": "0% APR forever on balance transfers",
-        "expected_claim_type": "promotional_or_introductory",
-        "expected_rule_ids": [
-          "CC-TRUTH-001"
-        ],
-        "expected_normalized_fields": {
-          "promo_rate_pct": 0
-        },
-        "location_note": "headline; the body line immediately below states the real 15-billing-cycle promotional term",
-        "description": "CC-PLAT's 0% intro APR runs 15 months and applies to PURCHASES ONLY (matrix notes; balance transfers carry a 3% fee and the standard variable APR). The headline advertises the rate as permanent ('forever') and as a balance-transfer rate — neither exists in the current offer matrix."
       },
       {
         "rule_area": "udaap_prohibited_phrase",
