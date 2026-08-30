@@ -192,6 +192,8 @@ def build_system_prompt(spec: dict) -> str:
         "  triggering_term]). Never split one statement into multiple claim objects.",
         "- `text` must be the VERBATIM rendered span (entity-decoded), not a paraphrase.",
         "- Extract every claim, compliant or not; the downstream checker decides compliance.",
+        "- Statements about availability, eligibility, or geography (states served, who",
+        "  qualifies) ARE claims — always extract them.",
         "- normalized_fields is the UNION of the payload contracts of every listed claim type",
         "  (each listed type's applicable fields present); keys WITHOUT the '?' suffix;",
         "  values stringified ('true'/'false' for booleans, plain digits for numbers).",
