@@ -201,6 +201,19 @@ def validate_claim_payload(claim: Claim) -> None:
         model = CLAIM_TYPE_PAYLOADS[ct]
         subset = {k: v for k, v in claim.normalized_fields.items() if k in model.model_fields}
         model.model_validate(subset)
+    # Contract-level CROSS-FIELD check (the map format declares fields one at a
+    # time and cannot express either/or requirements): a rate_or_apr claim must
+    # carry a single figure (value_pct) OR a full range (range_min_pct AND
+    # range_max_pct) — e.g. "Rates from 11.49% to 35.99%" is range-only.
+    if ClaimType.RATE_OR_APR in claim.claim_types:
+        nf = claim.normalized_fields
+        has_value = nf.get("value_pct") is not None
+        has_range = nf.get("range_min_pct") is not None and nf.get("range_max_pct") is not None
+        if not (has_value or has_range):
+            raise ValueError(
+                f"claim {claim.id}: rate claim requires value_pct or a range "
+                "(range_min_pct + range_max_pct)"
+            )
 
 
 class Disclosure(BaseModel):
