@@ -93,7 +93,35 @@ class ExtractionContext(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
+def _contains_literal(ann) -> bool:
+    import typing
+
+    if typing.get_origin(ann) is typing.Literal:
+        return True
+    return any(typing.get_origin(a) is typing.Literal for a in typing.get_args(ann))
+
+
+def _literal_values(ann) -> list[str]:
+    import typing
+
+    if typing.get_origin(ann) is typing.Literal:
+        return list(typing.get_args(ann))
+    vals: list[str] = []
+    for a in typing.get_args(ann):
+        if typing.get_origin(a) is typing.Literal:
+            vals.extend(typing.get_args(a))
+    return vals
+
+
 def _build_union_payload_model() -> type[BaseModel]:
+    # GRAMMAR-SIZE NOTE: Literal vocabularies in this model-facing schema blew
+    # the constrained-decoding grammar cap (API 400 "compiled grammar is too
+    # large"), so enum-ish fields are plain str here; the CONTRACT payload
+    # models keep their Literals and vocabulary enforcement lives post-hoc in
+    # validate_claim_payload + the corrective retry. If the grammar still
+    # 400s, the next lever is dropping extra="forbid" — NEVER the numeric
+    # typing (Optional floats/bools are what kill the empty-string class at
+    # decode time).
     from typing import Optional
 
     from pydantic import ConfigDict, create_model
@@ -101,7 +129,7 @@ def _build_union_payload_model() -> type[BaseModel]:
     fields: dict = {}
     for payload_model in CLAIM_TYPE_PAYLOADS.values():
         for name, info in payload_model.model_fields.items():
-            ann = Optional[info.annotation]
+            ann = Optional[str] if _contains_literal(info.annotation) else Optional[info.annotation]
             if name in fields and fields[name][0] != ann:
                 raise TypeError(
                     f"payload field collision with conflicting types: {name!r}"
@@ -185,6 +213,18 @@ def load_classification_spec(path: Path = LEGAL_MAP_PATH) -> dict:
     return types
 
 
+def _enum_vocabularies() -> list[tuple[str, list[str]]]:
+    """(field, allowed values) for every Literal-typed contract payload field —
+    surfaced in the prompt because the model-facing schema types them as str."""
+    seen: dict[str, list[str]] = {}
+    for payload_model in CLAIM_TYPE_PAYLOADS.values():
+        for name, info in payload_model.model_fields.items():
+            vals = _literal_values(info.annotation)
+            if vals and name not in seen:
+                seen[name] = list(vals)
+    return sorted(seen.items())
+
+
 def build_system_prompt(spec: dict) -> str:
     lines = [
         "You are a claim-and-disclosure extractor for consumer-finance marketing compliance.",
@@ -225,6 +265,11 @@ def build_system_prompt(spec: dict) -> str:
         "  WITHOUT the '?' suffix are REQUIRED whenever their claim type is listed and",
         "  must NEVER be omitted — emit them even when the answer is false or 0. Leave every",
         "  inapplicable field null; never use empty strings for missing values.",
+        "- Enum-valued fields (use EXACTLY one of the allowed values):",
+    ] + [
+        f"  - {name}: one of {' | '.join(vals)}"
+        for name, vals in _enum_vocabularies()
+    ] + [
         "",
         "## Disclosure types (assign exactly one per disclosure)",
         "- " + ", ".join(d.value for d in DisclosureType),

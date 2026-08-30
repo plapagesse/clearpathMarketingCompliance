@@ -416,19 +416,33 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
 
 
 def test_union_model_covers_payload_models_exactly():
-    """Drift discipline: _UnionPayload's fields+types must exactly cover the
-    union of the 9 contract payload models (every field Optional[payload type])."""
+    """Drift discipline: _UnionPayload's field names must exactly cover the
+    union of the 9 contract payload models; types must match EXCEPT the one
+    sanctioned widening — Literal-in-contract <-> str-in-union (grammar-size
+    cap; vocabulary enforcement is post-hoc). Assert the mapping explicitly so
+    it cannot silently widen further."""
     from typing import Optional
 
     expected: dict = {}
     for model in CLAIM_TYPE_PAYLOADS.values():
         for name, info in model.model_fields.items():
-            ann = Optional[info.annotation]
+            ann = Optional[str] if ex._contains_literal(info.annotation) else Optional[info.annotation]
             assert expected.get(name, ann) == ann, f"conflicting types for {name}"
             expected[name] = ann
     assert set(ex._UnionPayload.model_fields) == set(expected)
+    sanctioned_str_fields = set()
+    for model in CLAIM_TYPE_PAYLOADS.values():
+        for name, info in model.model_fields.items():
+            if ex._contains_literal(info.annotation):
+                sanctioned_str_fields.add(name)
+    assert sanctioned_str_fields == {
+        "rate_kind", "strength", "fee_claim_kind", "fee_type", "representation_kind"
+    }  # the ONLY fields allowed to be str-widened
     for name, ann in expected.items():
-        assert Optional[ex._UnionPayload.model_fields[name].annotation] == ann, name
+        union_ann = Optional[ex._UnionPayload.model_fields[name].annotation]
+        assert union_ann == ann, name
+        if name not in sanctioned_str_fields:
+            assert union_ann != Optional[str] or ann == Optional[str], name
     # closed object: extras forbidden -> phantom keys impossible at decode time
     with pytest.raises(ValidationError):
         ex._UnionPayload(bogus_key=1)
