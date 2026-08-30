@@ -91,6 +91,7 @@ def test_prompt_includes_spec_and_disclosure_enum():
     assert "NEGATIVE" in prompt
     assert "ONE claim per distinct statement" in prompt  # multi-label convention (amendment #4)
     assert "UNION" in prompt
+    assert "must NEVER be omitted" in prompt  # required-fields discipline for weaker models
     assert "VISUALLY" in prompt  # image-only prominence instruction
     assert "HTML" not in prompt
 
@@ -391,3 +392,28 @@ def test_grade_values_expected_null_semantics():
     assert ev._grade_values({"fixed_period_stated": None}, {"fixed_period_stated": None}) == []
     mm = ev._grade_values({"fixed_period_stated": None}, {"fixed_period_stated": "15 months"})
     assert len(mm) == 1 and mm[0]["reason"] == "value" and mm[0]["got"] == "15 months"
+
+
+def test_corrective_retry_includes_failure_text(monkeypatch, png):
+    """The second attempt must carry the exact failure text, not re-send the
+    identical request."""
+    seen_blocks = []
+
+    def flaky(client, system, blocks, model):
+        seen_blocks.append(blocks)
+        if len(seen_blocks) == 1:
+            bad = _fake_raw()
+            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
+            return bad
+        return _fake_raw()
+
+    monkeypatch.setattr(ex, "_call_model", flaky)
+    ctx = ex.ExtractionContext(product=Product.PERSONAL_LOAN, evidence_id="t6")
+    result = ex.extract(png, ctx, client=object())
+    assert len(seen_blocks) == 2 and result.claims
+    texts1 = [b.get("text", "") for b in seen_blocks[0] if b.get("type") == "text"]
+    texts2 = [b.get("text", "") for b in seen_blocks[1] if b.get("type") == "text"]
+    assert not any("failed validation" in t for t in texts1)
+    corrective = [t for t in texts2 if "failed validation" in t]
+    assert corrective and "bogus_key" in corrective[0]
+    assert "Re-emit the complete corrected extraction" in corrective[0]

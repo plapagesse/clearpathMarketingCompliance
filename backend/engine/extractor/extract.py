@@ -194,9 +194,11 @@ def build_system_prompt(spec: dict) -> str:
         "- Extract every claim, compliant or not; the downstream checker decides compliance.",
         "- Statements about availability, eligibility, or geography (states served, who",
         "  qualifies) ARE claims — always extract them.",
-        "- normalized_fields is the UNION of the payload contracts of every listed claim type",
-        "  (each listed type's applicable fields present); keys WITHOUT the '?' suffix;",
-        "  values stringified ('true'/'false' for booleans, plain digits for numbers).",
+        "- normalized_fields is the UNION of the payload contracts of every listed claim type.",
+        "  Fields WITHOUT the '?' suffix are REQUIRED whenever their claim type is listed and",
+        "  must NEVER be omitted — emit them even when the answer is 'false' or '0'. Only",
+        "  '?'-suffixed fields may be skipped when inapplicable. Values stringified",
+        "  ('true'/'false' for booleans, plain digits for numbers).",
         "",
         "## Disclosure types (assign exactly one per disclosure)",
         "- " + ", ".join(d.value for d in DisclosureType),
@@ -320,8 +322,19 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
             ),
         }
     ]
-    def _attempt() -> ExtractionResult:
-        raw = _call_model(client, system, blocks, model)
+    def _attempt(correction: str | None = None) -> ExtractionResult:
+        attempt_blocks = blocks
+        if correction is not None:
+            # corrective retry: tell the model exactly what failed instead of
+            # blindly re-sending the identical request
+            attempt_blocks = blocks + [{
+                "type": "text",
+                "text": (
+                    f"Your previous extraction failed validation: {correction}. "
+                    "Re-emit the complete corrected extraction."
+                ),
+            }]
+        raw = _call_model(client, system, attempt_blocks, model)
         result = _finalize(raw, context, model)
         for c in result.claims:
             validate_claim_payload(c)  # amendment #5: typed union-payload validation
@@ -331,5 +344,5 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
         return _attempt()
     except anthropic.APIStatusError:
         raise
-    except (ValidationError, json.JSONDecodeError, ValueError):
-        return _attempt()  # one retry on malformed output OR invalid payload
+    except (ValidationError, json.JSONDecodeError, ValueError) as e:
+        return _attempt(correction=str(e))  # one corrective retry, max 2 attempts
