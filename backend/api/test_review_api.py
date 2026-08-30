@@ -308,11 +308,12 @@ def test_post_rejects_missing_file_and_bad_product(client):
     assert bad_product.status_code == 400
 
 
-def test_reset_restores_the_seeded_fixtures(client, tmp_path):
+def test_reset_restores_the_seeded_fixtures(client, tmp_path, monkeypatch):
     """The demo reset button: back to the manifest, with every trace of a run gone."""
     from backend.db.models import CheckRunRow, FindingRow, ReviewDecisionRow, SubmissionRow
     from backend.db.session import get_session
 
+    monkeypatch.setenv("CLEARPATH_DEMO", "1")
     census = set(_census())
     checked_id = sorted(census)[0]
 
@@ -358,6 +359,45 @@ def test_reset_restores_the_seeded_fixtures(client, tmp_path):
 
     # And the reseeded rows are usable: a fresh run can be recorded again.
     assert client.get("/api/review/submissions").get_json()[0]["ai_status"] == "unprocessed"
+
+
+def test_reset_is_gated_off_by_default(client, monkeypatch):
+    """Unset CLEARPATH_DEMO on a non-debug process: the endpoint is not on offer.
+
+    The gate is the only thing standing between a deployment and an
+    unauthenticated wipe, so assert the closed state as well as the open one —
+    and that a refused call leaves the data alone.
+    """
+    monkeypatch.delenv("CLEARPATH_DEMO", raising=False)
+    checked_id = sorted(_census())[0]
+    _add_check_run(checked_id, ["high"], run_id="cr-gate-test")
+
+    assert client.post("/api/review/reset").status_code == 404
+
+    # Refused, not half-done: the run that existed before the call still does.
+    from backend.db.models import CheckRunRow
+    from backend.db.session import get_session
+
+    session = get_session()
+    try:
+        assert session.get(CheckRunRow, "cr-gate-test") is not None
+    finally:
+        session.close()
+
+    # An explicit falsey value is off too, so CLEARPATH_DEMO=0 cannot read as on.
+    monkeypatch.setenv("CLEARPATH_DEMO", "0")
+    assert client.post("/api/review/reset").status_code == 404
+
+    # ...but the Flask dev server keeps the button with no env change at all,
+    # which is what `python -m backend.app` (debug=True) gives a local reviewer.
+    monkeypatch.delenv("CLEARPATH_DEMO", raising=False)
+    monkeypatch.setattr(client.application, "debug", True)
+    assert client.post("/api/review/reset").status_code == 200
+
+    # An explicit opt-in wins over a non-debug process, which is the deploy path.
+    monkeypatch.setattr(client.application, "debug", False)
+    monkeypatch.setenv("CLEARPATH_DEMO", "1")
+    assert client.post("/api/review/reset").status_code == 200
 
 
 def test_evidence_serves_fixtures_and_rejects_traversal(client):

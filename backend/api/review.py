@@ -5,6 +5,7 @@ Four endpoints, all thin wrappers over the seeded submissions table:
   POST /api/review/submissions            multipart upload -> new SubmissionRow
   GET  /api/review/evidence/<filename>    serve a screenshot (uploads/, then fixtures/)
   POST /api/review/reset                  demo only: reseed from fixtures/, wipe uploads
+                                          (404 unless CLEARPATH_DEMO or debug)
 
 Every listed card carries the same AI-status summary the queue items do (see
 backend/api/common.py), so a reviewer can tell at a glance which inputs the
@@ -21,7 +22,7 @@ import uuid
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from sqlalchemy import select
 
 from backend.api.common import (
@@ -166,10 +167,30 @@ def create_submission():
 # --------------------------------------------------------------------------- #
 # Demo admin
 #
-# Deliberately unauthenticated, and deliberately destructive: this is the button
-# that puts a live walkthrough back to a known state between runs. It must not be
-# exposed anywhere the database holds anything a person would miss.
+# Unauthenticated and destructive: the button that puts a live walkthrough back
+# to a known state between runs. Because it takes no credentials, it is gated
+# instead — off unless a process opts in, so a deployment cannot expose it by
+# omission. See _demo_enabled().
 # --------------------------------------------------------------------------- #
+
+# Explicit falsey spellings, so CLEARPATH_DEMO=0 means off rather than "a
+# non-empty string, therefore on".
+DEMO_OFF_VALUES = {"0", "false", "no", "off"}
+
+
+def _demo_enabled() -> bool:
+    """Whether this process offers the demo admin tools.
+
+    CLEARPATH_DEMO is the deliberate switch a deployment sets knowingly (and can
+    set to 0 to be explicit). Unset, it falls back to app.debug, which keeps the
+    reset button working under `python -m backend.app` without anyone editing a
+    .env — while a production gunicorn process, which is neither in debug nor
+    opted in, has it off by default.
+    """
+    flag = (os.environ.get("CLEARPATH_DEMO") or "").strip()
+    if flag:
+        return flag.lower() not in DEMO_OFF_VALUES
+    return bool(current_app.debug)
 
 
 @review_bp.post("/reset")
@@ -180,7 +201,13 @@ def reset():
     state `python -m backend.db.seed` does and inherits any later change to it.
     Everything a demo accumulates goes with the schema: check runs, findings,
     review decisions, rule proposals, and submissions uploaded through the UI.
+
+    404s when the demo tools are off, so a server that does not offer this looks
+    to a caller exactly like one that never had the route.
     """
+    if not _demo_enabled():
+        return jsonify({"error": "demo reset is disabled on this server"}), 404
+
     summary = seed()
 
     # The evidence for those uploaded rows is now unreferenced. Best-effort by

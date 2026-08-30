@@ -56,4 +56,11 @@ The `Procfile` runs gunicorn with `--threads 8`: the batch AI review fires one
 worker would serialize them. Requests beyond the thread count queue rather than
 fail, so raise `--threads` if reviewers routinely batch more than a handful.
 
+`CLEARPATH_DEMO` gates the "Reset demo data" button's endpoint
+(`POST /api/review/reset`), which wipes every check run, decision and upload
+without asking for credentials. It is **off** unless the variable is set or the
+process is in Flask debug — so the dev server has it and a gunicorn deployment
+does not. Set it only on a throwaway demo instance, never on one holding work
+anyone would miss.
+
 _TODO_

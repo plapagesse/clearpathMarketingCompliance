@@ -23,8 +23,13 @@ function App() {
     }
     setResetting(true)
     fetch('/api/review/reset', { method: 'POST' })
-      .then((r) => r.json().then((body) => ({ ok: r.ok, body })))
-      .then(({ ok, body }) => {
+      // A gated-off server answers 404 — and so would one without the route at
+      // all, whose body is HTML rather than JSON.
+      .then((r) => r.json().catch(() => ({})).then((body) => ({ ok: r.ok, status: r.status, body })))
+      .then(({ ok, status, body }) => {
+        if (status === 404) {
+          throw new Error('the demo endpoint is disabled on this server (set CLEARPATH_DEMO).')
+        }
         if (!ok) throw new Error(body.error || 'reset failed')
         // Every view holds its own fetched copy of the data that just vanished;
         // a reload is the one refetch that is guaranteed to reach all of them.
