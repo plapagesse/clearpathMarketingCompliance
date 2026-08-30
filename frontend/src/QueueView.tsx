@@ -1,18 +1,8 @@
 import { useEffect, useState } from 'react'
 import './queue.css'
-
-type Finding = {
-  id: string
-  rule_id: string | null
-  severity: string
-  check_class: string
-  summary: string
-  explanation: string
-  citation_url: string | null
-  suggested_redline: string | null
-}
-
-type HistoryEvent = { when: string; event: string }
+import './status.css'
+import { FindingsPanel, HistoryList, type Finding, type HistoryEvent } from './FindingsPanel'
+import { ageText, aiChip } from './format'
 
 type Item = {
   submission_id: string
@@ -21,6 +11,8 @@ type Item = {
   surface: string
   proposed_headline: string
   image_url: string | null
+  date_submitted: string | null
+  days_ago: number | null
   sla_due: string | null
   days_left: number | null
   input_type: string
@@ -33,25 +25,12 @@ type Item = {
   history?: HistoryEvent[]
 }
 
-const BANNER_TEXT: Record<string, string> = {
-  quick_check: 'No issues found — quick double-check',
-  needs_attention: 'Some issues flagged — read them before deciding',
-  high_attention: 'Needs careful review',
-}
-
-function slaLine(item: Item) {
-  if (item.sla_due === null) return 'No SLA date'
-  if (item.days_left === null) return `SLA due ${item.sla_due}`
-  if (item.days_left < 0) return `SLA due ${item.sla_due} — ${-item.days_left} day(s) overdue`
-  if (item.days_left === 0) return `SLA due ${item.sla_due} — due today`
-  return `SLA due ${item.sla_due} — ${item.days_left} day(s) left`
-}
-
 function QueueView() {
   const [products, setProducts] = useState<string[]>([])
   const [partners, setPartners] = useState<string[]>([])
   const [product, setProduct] = useState('')
   const [partner, setPartner] = useState('')
+  const [inputType, setInputType] = useState('')
 
   const [items, setItems] = useState<Item[]>([])
   const [remaining, setRemaining] = useState(0)
@@ -82,6 +61,7 @@ function QueueView() {
     const params = new URLSearchParams()
     if (product) params.set('product', product)
     if (partner) params.set('partner', partner)
+    if (inputType) params.set('input_type', inputType)
     setLoading(true)
     fetch('/api/queue?' + params.toString())
       .then((r) => r.json())
@@ -95,7 +75,7 @@ function QueueView() {
       })
       .catch(() => setError('Could not load the queue.'))
       .then(() => setLoading(false))
-  }, [product, partner, reload])
+  }, [product, partner, inputType, reload])
 
   useEffect(() => {
     if (!currentId) {
@@ -145,6 +125,7 @@ function QueueView() {
   }
 
   const shown = detail || current
+  const chip = current ? aiChip(current) : null
 
   return (
     <div className="queue">
@@ -154,7 +135,7 @@ function QueueView() {
           <select
             value={product}
             onChange={(e) => {
-              // A filter change starts the reviewer back at the most urgent item.
+              // A filter change starts the reviewer back at the oldest item.
               setCursor(0)
               setProduct(e.target.value)
             }}
@@ -184,6 +165,20 @@ function QueueView() {
             ))}
           </select>
         </label>
+        <label>
+          Input type{' '}
+          <select
+            value={inputType}
+            onChange={(e) => {
+              setCursor(0)
+              setInputType(e.target.value)
+            }}
+          >
+            <option value="">All input types</option>
+            <option value="proposed">Proposed</option>
+            <option value="production">Production</option>
+          </select>
+        </label>
         <strong className="counter">{remaining} remaining to review</strong>
       </div>
 
@@ -207,10 +202,9 @@ function QueueView() {
             <div className="ident">
               <h2>{current.submission_id}</h2>
               <span className={'badge badge-' + current.input_type}>{current.input_type}</span>
+              {chip && <span className={chip.className}>{chip.label}</span>}
             </div>
-            <p className={current.days_left !== null && current.days_left < 0 ? 'sla overdue' : 'sla'}>
-              {slaLine(current)}
-            </p>
+            <p className="age">{ageText(current.days_ago)}</p>
             <p className="muted small">
               {current.product} · {current.surface} · {current.partner}
             </p>
@@ -225,57 +219,17 @@ function QueueView() {
               </div>
             ) : (
               <div className="block">
-                <div className={'banner banner-' + (current.attention || 'quick_check')}>
-                  {BANNER_TEXT[current.attention || 'quick_check']}
-                  <span className="banner-count">
-                    {' '}
-                    ({current.findings_count} finding
-                    {current.findings_count === 1 ? '' : 's'})
-                  </span>
-                </div>
-
-                {!shown?.findings && <p className="muted small">Loading findings…</p>}
-
-                {shown?.findings?.map((f) => (
-                  <div className="finding" key={f.id}>
-                    <div className="finding-head">
-                      <span className={'chip chip-' + f.severity}>{f.severity}</span>
-                      <span className="rule">{f.rule_id || f.check_class}</span>
-                    </div>
-                    <p className="finding-summary">{f.summary}</p>
-                    {f.suggested_redline && (
-                      <p className="redline">Suggested: {f.suggested_redline}</p>
-                    )}
-                    {f.citation_url && (
-                      <p className="small">
-                        <a href={f.citation_url} target="_blank" rel="noreferrer">
-                          citation
-                        </a>
-                      </p>
-                    )}
-                  </div>
-                ))}
-
-                {shown?.findings?.length === 0 && (
-                  <p className="muted small">The engine raised no findings.</p>
-                )}
+                <FindingsPanel
+                  attention={current.attention}
+                  findingsCount={current.findings_count}
+                  findings={shown?.findings}
+                />
               </div>
             )}
 
             <div className="block">
               <h3>History</h3>
-              {shown?.history ? (
-                <ul className="history">
-                  {shown.history.map((h, i) => (
-                    <li key={i}>
-                      <span className="muted">{h.when.slice(0, 16).replace('T', ' ')}</span>{' '}
-                      {h.event}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="muted small">Loading history…</p>
-              )}
+              <HistoryList history={shown?.history} />
             </div>
 
             <div className="block">

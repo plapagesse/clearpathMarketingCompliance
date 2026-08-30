@@ -1,0 +1,255 @@
+/* Rulebook page. Same muted palette as the other two views; laid out as a
+   document, because it is read rather than operated. */
+
+.rulebook {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #1c1e21;
+  background: #ffffff;
+  min-height: 100vh;
+  text-align: left;
+}
+
+.rb-topbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.25rem;
+  border-bottom: 1px solid #dcdfe3;
+  padding-bottom: 1rem;
+}
+
+.rb-topbar h1 {
+  font-size: 1.35rem;
+  margin: 0;
+  margin-right: auto;
+  align-self: center;
+}
+
+.rb-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #62676d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rb-filter select {
+  font-size: 0.9rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c7ccd1;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c1e21;
+  min-width: 11rem;
+}
+
+.rb-intro {
+  margin: 1rem 0 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #1c1e21;
+  max-width: 46rem;
+}
+
+.rb-version {
+  margin: 0 0 1.5rem;
+  font-size: 0.8rem;
+  color: #62676d;
+}
+
+.rulebook section {
+  margin-bottom: 2rem;
+}
+
+.rulebook h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #62676d;
+  margin: 0 0 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e6e8eb;
+}
+
+.rb-lede {
+  margin: 0.5rem 0 0.9rem;
+  font-size: 0.85rem;
+  color: #62676d;
+}
+
+.rb-empty {
+  font-size: 0.85rem;
+  color: #62676d;
+}
+
+/* --- rules --- */
+
+.rb-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rb-rule {
+  border-left: 3px solid #e6e8eb;
+  padding: 0.5rem 0 0.5rem 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.rb-rule-description {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.rb-rule-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.78rem;
+  color: #62676d;
+}
+
+.rb-rule-meta a {
+  color: #33506f;
+}
+
+.rb-product {
+  color: #62676d;
+}
+
+.rb-rule-id {
+  font-family: ui-monospace, monospace;
+  color: #8a9099;
+}
+
+.rb-pending {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: #f0f0f0;
+  color: #555;
+  padding: 1px 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* --- claim types --- */
+
+.rb-claim-types {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rb-claim-types > li {
+  margin-bottom: 1.1rem;
+}
+
+.rb-claim-types h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  text-transform: capitalize;
+}
+
+.rb-definition {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #3d4145;
+}
+
+.rb-fields {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.rb-fields li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.15rem 0;
+}
+
+.rb-field-name {
+  font-family: ui-monospace, monospace;
+  color: #1c1e21;
+  min-width: 11rem;
+}
+
+.rb-field-type {
+  color: #33506f;
+}
+
+.rb-field-optional {
+  color: #8a9099;
+}
+
+.rb-field-values {
+  color: #62676d;
+  font-family: ui-monospace, monospace;
+}
+
+/* --- proposal form --- */
+
+.rb-form {
+  border: 1px solid #dcdfe3;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  background: #fafbfc;
+  max-width: 30rem;
+}
+
+.rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.75rem;
+  color: #62676d;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rb-field input,
+.rb-field select,
+.rb-field textarea {
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c7ccd1;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c1e21;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.rb-form button {
+  font-size: 0.9rem;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid #2f5db3;
+  border-radius: 4px;
+  background: #2f5db3;
+  color: #fff;
+  cursor: pointer;
+}
+
+.rb-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rulebook .error {
+  color: #b3261e;
+  font-size: 0.85rem;
+}

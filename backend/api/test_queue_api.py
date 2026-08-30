@@ -40,6 +40,7 @@ def _add_submission(
     submission_id: str,
     sla_due: date | None,
     *,
+    date_submitted: date = date(2026, 8, 20),
     product: str = "personal_loan",
     partner: str = "credit_karma",
     mode: str = "pre_publication",
@@ -51,7 +52,7 @@ def _add_submission(
         id=submission_id,
         submission_id=submission_id,
         partner=partner,
-        date_submitted=date(2026, 8, 20),
+        date_submitted=date_submitted,
         surface="marketplace_offer_card",
         product=product,
         template_id="CK-PL-CARD",
@@ -110,25 +111,44 @@ def _add_check_run(submission_id: str, findings: list[tuple[str, str]], run_id: 
 # --------------------------------------------------------------------------- #
 
 
-def test_queue_orders_by_sla_due_ascending(client):
-    _add_submission("SUB-B", date(2026, 9, 5))
-    _add_submission("SUB-A", date(2026, 8, 29))
-    _add_submission("SUB-C", date(2026, 9, 1))
+def test_queue_orders_oldest_submission_first(client):
+    """UI iteration 2: the queue is worked in arrival order, not SLA order.
+
+    The SLA dates below are deliberately in the opposite order to the submission
+    dates, so this can only pass if date_submitted is what sorts.
+    """
+    _add_submission("SUB-B", date(2026, 8, 29), date_submitted=date(2026, 8, 22))
+    _add_submission("SUB-A", date(2026, 9, 5), date_submitted=date(2026, 8, 20))
+    _add_submission("SUB-C", date(2026, 8, 25), date_submitted=date(2026, 8, 24))
 
     body = client.get("/api/queue").get_json()
 
     assert body["remaining"] == 3
-    assert [i["submission_id"] for i in body["items"]] == ["SUB-A", "SUB-C", "SUB-B"]
+    assert [i["submission_id"] for i in body["items"]] == ["SUB-A", "SUB-B", "SUB-C"]
 
 
-def test_queue_puts_undated_submissions_last(client):
-    _add_submission("SUB-NODATE", None)
-    _add_submission("SUB-DATED", date(2026, 9, 9))
+def test_queue_items_report_age_in_days(client):
+    _add_submission("SUB-OLD", None, date_submitted=date.today() - timedelta(days=6))
+    _add_submission("SUB-TODAY", None, date_submitted=date.today())
 
     items = client.get("/api/queue").get_json()["items"]
 
-    assert [i["submission_id"] for i in items] == ["SUB-DATED", "SUB-NODATE"]
-    assert items[1]["sla_due"] is None and items[1]["days_left"] is None
+    assert [i["submission_id"] for i in items] == ["SUB-OLD", "SUB-TODAY"]
+    assert items[0]["days_ago"] == 6
+    assert items[1]["days_ago"] == 0
+
+
+def test_queue_still_carries_sla_due_even_though_the_ui_ignores_it(client):
+    """sla_due/days_left stay in the payload as data; only the display moved to age."""
+    _add_submission("SUB-DATED", date.today() + timedelta(days=4))
+    _add_submission("SUB-NODATE", None, date_submitted=date(2026, 8, 21))
+
+    by_id = {i["submission_id"]: i for i in client.get("/api/queue").get_json()["items"]}
+
+    assert by_id["SUB-DATED"]["days_left"] == 4
+    assert by_id["SUB-DATED"]["sla_due"] == (date.today() + timedelta(days=4)).isoformat()
+    assert by_id["SUB-NODATE"]["sla_due"] is None
+    assert by_id["SUB-NODATE"]["days_left"] is None
 
 
 def test_queue_filters_by_product_and_partner(client):
@@ -142,10 +162,28 @@ def test_queue_filters_by_product_and_partner(client):
     assert body["remaining"] == 1
 
 
+def test_queue_filters_by_input_type(client):
+    _add_submission("SUB-PROPOSED", None, mode="pre_publication")
+    _add_submission("SUB-PROD", None, mode="verification")
+
+    proposed = client.get("/api/queue?input_type=proposed").get_json()
+    production = client.get("/api/queue?input_type=production").get_json()
+    everything = client.get("/api/queue?input_type=").get_json()
+
+    assert [i["submission_id"] for i in proposed["items"]] == ["SUB-PROPOSED"]
+    assert proposed["remaining"] == 1
+    assert [i["submission_id"] for i in production["items"]] == ["SUB-PROD"]
+    assert everything["remaining"] == 2
+
+    assert client.get("/api/queue?input_type=banana").status_code == 400
+
+
 def test_item_reports_input_type_days_left_and_image_url(client):
     due = date.today() + timedelta(days=3)
-    _add_submission("SUB-PROPOSED", due, mode="pre_publication")
-    _add_submission("SUB-PROD", due + timedelta(days=1), mode="verification")
+    _add_submission("SUB-PROPOSED", due, date_submitted=date(2026, 8, 20))
+    _add_submission(
+        "SUB-PROD", due + timedelta(days=1), date_submitted=date(2026, 8, 21), mode="verification"
+    )
 
     items = client.get("/api/queue").get_json()["items"]
 

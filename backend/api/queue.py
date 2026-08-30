@@ -1,8 +1,9 @@
 """Flask blueprint: the reviewer queue at /api/queue.
 
-One submission at a time, most urgent first. A submission leaves the queue the
-moment a ReviewDecisionRow exists for it, so `remaining` is the honest count of
-what is still on the reviewer's plate.
+One submission at a time, oldest first — the queue is worked in arrival order,
+so the longest-waiting partner is never the last one looked at. A submission
+leaves the queue the moment a ReviewDecisionRow exists for it, so `remaining` is
+the honest count of what is still on the reviewer's plate.
 
 Screenshots are served by the input view's /api/review/evidence/<file> route;
 this module only resolves the on-disk path when it needs to feed the engine.
@@ -18,6 +19,14 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
+from backend.api.common import (
+    SEVERITY_RANK,
+    ai_summary,
+    days_ago,
+    filter_by_input_type,
+    input_type,
+    latest_check_run,
+)
 from backend.db.models import CheckRunRow, FindingRow, ReviewDecisionRow, SubmissionRow
 from backend.db.session import get_session
 
@@ -28,9 +37,6 @@ UPLOADS_DIR = REPO_ROOT / "uploads"
 FIXTURES_DIR = REPO_ROOT / "fixtures"
 RULEBOOK_DIR = REPO_ROOT / "rulebook"
 OFFER_MATRIX_CSV = FIXTURES_DIR / "offer_matrix.csv"
-
-# Rank severities so "the worst finding in the run" is a max(), not a lookup table.
-SEVERITY_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 EXCERPT_CHARS = 200
 
@@ -75,29 +81,6 @@ def _days_left(sla_due: date | None) -> int | None:
     return (sla_due - date.today()).days
 
 
-def _input_type(mode: str) -> str:
-    return "production" if mode == "verification" else "proposed"
-
-
-def _attention(severities: list[str]) -> str:
-    """Three buckets, so the reviewer knows how hard to look before they look."""
-    worst = max((SEVERITY_RANK.get(s, 0) for s in severities), default=-1)
-    if worst >= SEVERITY_RANK["high"]:
-        return "high_attention"
-    if worst >= SEVERITY_RANK["medium"]:
-        return "needs_attention"
-    return "quick_check"
-
-
-def _latest_check_run(session, sub: SubmissionRow) -> CheckRunRow | None:
-    return session.execute(
-        select(CheckRunRow)
-        .where(CheckRunRow.submission_id == sub.id)
-        .order_by(CheckRunRow.created_at.desc(), CheckRunRow.id.desc())
-        .limit(1)
-    ).scalar_one_or_none()
-
-
 def _item(session, sub: SubmissionRow) -> dict:
     filename = _evidence_file(sub)
     item = {
@@ -109,25 +92,15 @@ def _item(session, sub: SubmissionRow) -> dict:
         # Served by the input view's blueprint — same uploads/-then-fixtures/
         # lookup, so there is no reason for a second copy of that route here.
         "image_url": f"/api/review/evidence/{filename}" if filename else None,
+        "date_submitted": sub.date_submitted.isoformat() if sub.date_submitted else None,
+        # What the UI shows now. sla_due/days_left stay in the payload: the SLA
+        # is still real data, it just isn't what the reviewer is steered by.
+        "days_ago": days_ago(sub.date_submitted),
         "sla_due": sub.sla_due.isoformat() if sub.sla_due else None,
         "days_left": _days_left(sub.sla_due),
-        "input_type": _input_type(sub.mode),
-        "ai_status": "unprocessed",
+        "input_type": input_type(sub.mode),
     }
-    run = _latest_check_run(session, sub)
-    if run is not None:
-        severities = [f.severity for f in run.findings]
-        item.update(
-            {
-                "ai_status": "processed",
-                "max_severity": max(severities, key=lambda s: SEVERITY_RANK.get(s, 0))
-                if severities
-                else None,
-                "findings_count": len(severities),
-                "attention": _attention(severities),
-                "latest_check_run_id": run.id,
-            }
-        )
+    item.update(ai_summary(session, sub))
     return item
 
 
@@ -150,9 +123,10 @@ def _decided_ids(session) -> list[str]:
 
 @queue_bp.get("")
 def queue():
-    """Undecided submissions for a product/partner combo, most urgent first."""
+    """Undecided submissions for a product/partner/input-type combo, oldest first."""
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
+    wanted_type = (request.args.get("input_type") or "").strip()
 
     session = get_session()
     try:
@@ -161,13 +135,17 @@ def queue():
             stmt = stmt.where(SubmissionRow.product == product)
         if partner:
             stmt = stmt.where(SubmissionRow.partner == partner)
+        try:
+            stmt = filter_by_input_type(stmt, wanted_type)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         decided = _decided_ids(session)
         if decided:
             stmt = stmt.where(SubmissionRow.id.notin_(decided))
-        # sla_due ascending; undated submissions sort last, ids break ties.
+        # Oldest first: the reviewer works the backlog in arrival order, so the
+        # submission that has waited longest is the one on screen. Ids break ties.
         stmt = stmt.order_by(
-            SubmissionRow.sla_due.is_(None),
-            SubmissionRow.sla_due.asc(),
+            SubmissionRow.date_submitted.asc(),
             SubmissionRow.submission_id.asc(),
         )
         subs = list(session.execute(stmt).scalars().all())
@@ -201,7 +179,7 @@ def detail(sid: str):
         item = _item(session, sub)
 
         findings = []
-        run = _latest_check_run(session, sub)
+        run = latest_check_run(session, sub)
         if run is not None:
             findings = [
                 {

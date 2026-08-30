@@ -1,9 +1,13 @@
 """Flask blueprint backing the reviewer input view at /api/review.
 
 Three endpoints, all thin wrappers over the seeded submissions table:
-  GET  /api/review/submissions            list (optional product/partner filters)
+  GET  /api/review/submissions            list (optional product/partner/input_type)
   POST /api/review/submissions            multipart upload -> new SubmissionRow
   GET  /api/review/evidence/<filename>    serve a screenshot (uploads/, then fixtures/)
+
+Every listed card carries the same AI-status summary the queue items do (see
+backend/api/common.py), so a reviewer can tell at a glance which inputs the
+engine has already looked at without opening them one by one.
 
 Seeding is unchanged (``python -m backend.db.seed``); this module only makes
 sure the tables exist so a fresh checkout answers instead of 500-ing.
@@ -19,9 +23,15 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_from_directory
 from sqlalchemy import select
 
+from backend.api.common import (
+    ai_summary,
+    days_ago,
+    filter_by_input_type,
+    input_type,
+    open_session,
+)
 from backend.contracts import Product, SubmissionMode
 from backend.db.models import SubmissionRow
-from backend.db.session import get_session, init_db
 
 review_bp = Blueprint("review", __name__, url_prefix="/api/review")
 
@@ -34,53 +44,56 @@ DEFAULT_SURFACE = "manual_upload"
 INPUT_TYPES = {"proposed": SubmissionMode.PRE_PUBLICATION, "production": SubmissionMode.VERIFICATION}
 
 
-def _session():
-    """Session against the app DB, creating tables if this is a fresh file."""
-    init_db()  # create_all is a no-op once the schema is there; never resets data
-    return get_session()
-
-
-def _input_type(mode: str) -> str:
-    return "production" if mode == SubmissionMode.VERIFICATION.value else "proposed"
-
-
 def _image_url(row: SubmissionRow) -> str | None:
     """First image asset of the submission, as an evidence URL."""
     images = [f for f in (row.asset_files or []) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
     return f"/api/review/evidence/{images[0]}" if images else None
 
 
-def _serialize(row: SubmissionRow) -> dict:
-    return {
+def _serialize(session, row: SubmissionRow) -> dict:
+    card = {
         "submission_id": row.submission_id,
         "product": row.product,
         "partner": row.partner,
         "surface": row.surface,
         "mode": row.mode,
         "date_submitted": row.date_submitted.isoformat() if row.date_submitted else None,
+        # The card shows age now; sla_due stays in the payload as data, unused.
+        "days_ago": days_ago(row.date_submitted),
         "sla_due": row.sla_due.isoformat() if row.sla_due else None,
         "image_url": _image_url(row),
-        "input_type": _input_type(row.mode),
+        "input_type": input_type(row.mode),
     }
+    card.update(ai_summary(session, row))
+    return card
 
 
 @review_bp.get("/submissions")
 def list_submissions():
-    """Query params: product, partner (both optional, exact match)."""
+    """Query params: product, partner, input_type (all optional, exact match).
+
+    Oldest first, matching the queue: the grid and the queue walk the backlog in
+    the same order, so "the next thing to look at" means the same in both views.
+    """
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
+    wanted_type = (request.args.get("input_type") or "").strip()
 
     stmt = select(SubmissionRow)
     if product:
         stmt = stmt.where(SubmissionRow.product == product)
     if partner:
         stmt = stmt.where(SubmissionRow.partner == partner)
-    stmt = stmt.order_by(SubmissionRow.date_submitted.desc(), SubmissionRow.submission_id)
+    try:
+        stmt = filter_by_input_type(stmt, wanted_type)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    stmt = stmt.order_by(SubmissionRow.date_submitted.asc(), SubmissionRow.submission_id)
 
-    session = _session()
+    session = open_session()
     try:
         rows = session.execute(stmt).scalars().all()
-        return jsonify([_serialize(row) for row in rows])
+        return jsonify([_serialize(session, row) for row in rows])
     finally:
         session.close()
 
@@ -99,8 +112,8 @@ def create_submission():
     if not partner:
         return jsonify({"error": "partner is required"}), 400
 
-    input_type = (request.form.get("input_type") or "proposed").strip()
-    if input_type not in INPUT_TYPES:
+    wanted_type = (request.form.get("input_type") or "proposed").strip()
+    if wanted_type not in INPUT_TYPES:
         return jsonify({"error": "input_type must be 'proposed' or 'production'"}), 400
 
     surface = (request.form.get("surface") or "").strip() or DEFAULT_SURFACE
@@ -127,14 +140,14 @@ def create_submission():
         change_summary=notes,
         status="pending_review",
         sla_due=today + timedelta(days=SLA_DAYS),
-        mode=INPUT_TYPES[input_type].value,
+        mode=INPUT_TYPES[wanted_type].value,
     )
 
-    session = _session()
+    session = open_session()
     try:
         session.add(row)
         session.commit()
-        return jsonify(_serialize(row)), 201
+        return jsonify(_serialize(session, row)), 201
     finally:
         session.close()
 

@@ -1,0 +1,43 @@
+/* The AI-status chip. Unscoped on purpose: the same chip appears on an input
+   card and in the queue's header, and it has to look the same in both. */
+
+.ai-chip {
+  display: inline-block;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.ai-chip-none {
+  background: #f0f0f0;
+  border-color: #ccc;
+  color: #555;
+}
+
+.ai-chip-clean {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+  color: #245c31;
+}
+
+.ai-chip-review {
+  background: #fdf3e2;
+  border-color: #dfc088;
+  color: #7a5410;
+}
+
+.ai-chip-issues {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+.ai-chip-busy {
+  background: #eef2f7;
+  border-color: #b8c6d8;
+  color: #33506f;
+}

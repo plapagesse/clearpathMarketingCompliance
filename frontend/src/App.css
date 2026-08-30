@@ -58,6 +58,65 @@
   cursor: pointer;
 }
 
+.back-button {
+  font: inherit;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #c7ccd1;
+  border-radius: 4px;
+  background: #f5f6f7;
+  color: #1c1e21;
+  cursor: pointer;
+}
+
+/* --- batch AI review --- */
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  border: 1px solid #b8c6d8;
+  border-radius: 4px;
+  background: #eef2f7;
+}
+
+.run-button {
+  font: inherit;
+  padding: 0.4rem 1rem;
+  border: 1px solid #2f5db3;
+  border-radius: 4px;
+  background: #2f5db3;
+  color: #fff;
+  cursor: pointer;
+}
+
+.run-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.linkish {
+  font: inherit;
+  border: none;
+  background: none;
+  color: #33506f;
+  text-decoration: underline;
+  padding: 0.4rem 0.2rem;
+  cursor: pointer;
+}
+
+.linkish:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.batch-note {
+  font-size: 0.85rem;
+  color: #62676d;
+  margin: 0 0 1rem;
+}
+
 /* --- upload form --- */
 
 .upload-form {
@@ -123,10 +182,30 @@
 }
 
 .card {
+  position: relative; /* anchors the select checkbox to the top-left corner */
   border: 1px solid #dcdfe3;
   border-radius: 6px;
   padding: 0.75rem;
   background: #fff;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: #b8c6d8;
+  box-shadow: 0 1px 4px rgba(28, 30, 33, 0.12);
+}
+
+.card-check {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  cursor: pointer;
+  /* The thumbnail sits behind it, so give the box its own backing. */
+  background: #fff;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 /* Fixture screenshots are full-page and very tall, so the card shows the top
@@ -177,20 +256,104 @@
   color: #43664a;
 }
 
+.card-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .card-surface {
   font-size: 0.8rem;
   color: #62676d;
   margin: 0.5rem 0 0.25rem;
 }
 
+/* How long this input has been waiting — the queue says the same thing. */
 .sla {
   font-size: 0.8rem;
   color: #62676d;
 }
 
-.sla-late {
-  color: #b3261e;
-  font-weight: 600;
+/* --- individual input --- */
+
+.detail {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.detail-shot {
+  flex: 0 0 55%;
+  border: 1px solid #dcdfe3;
+  border-radius: 6px;
+  background: #fafafa;
+  padding: 0.5rem;
+}
+
+.detail-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.detail-side {
+  flex: 1;
+  min-width: 18rem;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.detail-head h1 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.detail-block {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e6e8eb;
+}
+
+.detail-block h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #62676d;
+  margin: 0 0 0.5rem;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0.9rem 0 0;
+  font-size: 0.85rem;
+}
+
+.meta dt {
+  color: #62676d;
+}
+
+.meta dd {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .detail {
+    flex-direction: column;
+  }
+
+  .detail-shot {
+    flex: 1 1 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 /* --- messages --- */
