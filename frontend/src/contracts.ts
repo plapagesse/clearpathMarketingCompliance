@@ -7,8 +7,8 @@ export type Product = 'personal_loan' | 'credit_card' | 'mortgage_prequal'
 
 /**
  * Legal-entity taxonomy: each value names the body of law governing the claim.
- * A text span embodying two legal categories yields two Claim objects
- * (extractor convention — no multi-label claims). See CONTRACTS.md.
+ * Claims are MULTI-LABEL (amendment #4): one statement = one Claim object,
+ * listing every legal category it embodies. See CONTRACTS.md.
  */
 export type ClaimType =
   | 'triggering_term' // Reg Z 1026.24(d) / 1026.16(b)
@@ -43,12 +43,20 @@ export type BadgeDesignation = 'prequalified' | 'pre-approved'
 
 export interface Claim {
   id: string
-  claim_type: ClaimType
+  /** Every legal category this statement embodies (amendment #4; min length 1) */
+  claim_types: ClaimType[]
   text: string
   location: string
   source_evidence_id: string
+  /** Amendment #5: union of the listed claim types' payload contracts (see NormalizedFields) */
+  normalized_fields: NormalizedFields
 }
 
+/* Claim-type payloads (amendment #5, derived): the SOURCE OF TRUTH is
+   rulebook/claim_types_legal_map.json — backend payload models are generated
+   from it at import time. The frontend uses an open record; per-field types
+   and vocabularies live in the map. */
+export type NormalizedFields = Record<string, string | number | boolean | null>
 export interface Disclosure {
   id: string
   disclosure_type: DisclosureType
