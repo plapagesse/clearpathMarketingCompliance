@@ -3,7 +3,7 @@
 One service, one container: Flask serves the API under `/api/*` and the built
 React bundle for everything else. SQLite is the database and it is **re-seeded
 from `fixtures/` on every boot** — each deploy or restart starts from clean
-demo state (10 fixture submissions + the current offer matrix). That is
+demo state (16 fixture submissions + the current offer matrix). That is
 deliberate: uploads and review decisions do not survive a restart.
 
 The image is defined by the root `Dockerfile` (multi-stage: node builds the
@@ -26,6 +26,7 @@ runs the same script for Procfile-based hosts.
 | `ANTHROPIC_WORKSPACE_ID` | only for identity-linked keys | Sends the workspace header; find it in the Anthropic Console under Settings → Workspaces. |
 | `CLEARPATH_DEMO` | demo deployments only | `1` enables the demo reset endpoint so anyone viewing the demo can restore clean state. It lets **any visitor wipe the database** — never set it on a real deployment. |
 | `ANTHROPIC_MODEL` | no | Model override for extraction; leave unset for the default. |
+| `CLEARPATH_JUDGE_MODEL` | no | Model override for the LLM judge; defaults to `claude-sonnet-5`. |
 
 `PORT` is injected by the platform; `CLEARPATH_DB` is already set in the image
 (`sqlite:////app/data/clearpath.db`) — don't override either.
