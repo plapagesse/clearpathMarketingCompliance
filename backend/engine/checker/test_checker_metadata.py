@@ -55,14 +55,18 @@ def test_state_leak_uses_all_targeting_syntax(rulebook, real_cells):
 
 
 def test_state_available_through_any_referenced_cell_is_not_a_leak(rulebook, real_cells):
-    """Answer-key-derived semantics: SUB-2026-0142 (certified compliant,
-    zero expected findings) targets 'ALL except IA;WV' — which includes IL —
-    while referencing BOTH PL-36-A (available in IL) and PL-60-A (IL
-    excluded). Therefore a targeted state counts as a leak only when EVERY
-    referenced offer cell excludes it; one available cell keeps the
-    placement honest for that state."""
+    """AMENDED PER COORDINATOR ARBITRATION (authorized edit #2): a targeted
+    state excluded by SOME but not ALL referenced cells is neither silence nor
+    a full violation — it emits a needs_verification-style finding BELOW
+    medium naming the ambiguity (one available cell may keep the placement
+    honest for that state, but per-state offer routing is unverified). A full
+    violation requires EVERY referenced cell to exclude the targeted state."""
+    # Targeting mirrors the post-hygiene PL-36-A footprint (fully-excluded
+    # capped states removed) so ONLY partially-excluded states (IL, MD, ME,
+    # NC, NJ — excluded by PL-60-A, available via PL-36-A) remain targeted.
     sub = make_submission(
-        offer_ids=["PL-36-A", "PL-60-A"], states_targeted="ALL except IA;WV"
+        offer_ids=["PL-36-A", "PL-60-A"],
+        states_targeted="ALL except AR;DC;IA;MA;NE;NY;VT;WV",
     )
     result = run(
         rulebook,
@@ -72,7 +76,11 @@ def test_state_available_through_any_referenced_cell_is_not_a_leak(rulebook, rea
         disclosures=[],
         artifact_text="You're prequalified for up to $50,000.",
     )
-    assert "PL-STATE-EXCL-001" not in emitted_rule_ids(result)
+    partial = [f for f in result.findings if f.rule_id == "PL-STATE-EXCL-001"]
+    assert partial, "partial exclusion must not be silent"
+    for f in partial:
+        assert f.severity in (Severity.LOW, Severity.INFO), f
+        assert "verif" in f.summary.lower() or "verif" in f.explanation.lower(), f
 
 
 def test_targeting_fully_outside_exclusions_is_clean(rulebook, real_cells):

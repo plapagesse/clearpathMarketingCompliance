@@ -2,7 +2,8 @@
 
 Exact inventory of every input field the engine **reads** while evaluating the
 38 deterministic rules (rulebook v2026.08.3). If a field is not listed for a
-rule, the engine never touches it. This ledger is the demand-side input to the
+rule, the engine never touches it. Composite claim_field names now use the payload vocabulary directly
+(ruling: no internal mapping layer). This ledger is the demand-side input to the
 claim-type payload trim: a `normalized_fields` key read by no rule below (and
 reserved by no judge rule) has no deterministic consumer.
 
@@ -15,12 +16,12 @@ reserved by no judge rule) has no deterministic consumer.
 | `value_pct` | PL-TRUTH-001, MTG-TRUTH-001, PL-STATE-CAP-001 | rate/floor reconciliation vs matrix; advertised-max vs state caps |
 | `range_min_pct` | CC-TRUTH-001 | post-promo APR range vs matrix |
 | `range_max_pct` | CC-TRUTH-001, PL-STATE-CAP-001 | range top vs matrix / state caps |
-| `is_floor_claim` | PL-TRUTH-001 (rate_floor resolver), fidelity diff | selects floor claims; floor == apr_min check |
+| `is_floor_claim` | PL-TRUTH-001 (`claim_filter`), fidelity diff | selects floor claims; floor == apr_min check |
 | `labeled_as_apr` | MTG-TRUTH-001 (not_conflated) | unlabeled-rate conflation check |
 | `rate_kind` | MTG-TRUTH-001 (not_conflated) | unlabeled-rate conflation check |
 | `term_months` | PL-TRUTH-001 | exists_in vs cell term_months |
 | `amount_value` | PL-TRUTH-001, CC-TRUTH-001 (annual_fee_value) | amount within cell bounds; annual-fee equality |
-| `fee_type` | CC-TRUTH-001 (annual_fee_value resolver) | selects annual-fee claims |
+| `fee_type` | CC-TRUTH-001 (`claim_filter`) | selects annual-fee claims |
 | `promo_rate_pct` | CC-TRUTH-001 | intro APR equality vs matrix |
 | `promo_period_months` | CC-TRUTH-001 | intro period equality vs matrix |
 

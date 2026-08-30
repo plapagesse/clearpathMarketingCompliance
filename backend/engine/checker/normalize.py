@@ -69,7 +69,9 @@ def phrase_hits(phrases: list[str], text: str, match: str) -> list[str]:
             if re.search(p, text, re.IGNORECASE):
                 hits.append(p)
     else:  # case_insensitive_substring (default)
+        # Word-boundary aware per the README normalization spec: pluralization
+        # is never implied ("counselors" must not hit the phrase "counselor").
         for p in phrases:
-            if normalize(p) in text:
+            if re.search(rf"\b{re.escape(normalize(p))}\b", text):
                 hits.append(p)
     return hits

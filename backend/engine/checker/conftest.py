@@ -50,7 +50,7 @@ RULEBOOK_DIR = REPO / "rulebook"
 
 # Pinned versions (rulebook/manifest.json; fixtures/expected_findings.json
 # `_offer_matrix_version`).
-RULEBOOK_VERSION = "2026.08.3"
+RULEBOOK_VERSION = "2026.08.4"  # authorized factual refresh: triage bump postdated the suite
 OFFER_MATRIX_VERSION = "2026-08"
 
 SEV_AT_LEAST_MEDIUM = {Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL}

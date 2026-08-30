@@ -161,12 +161,16 @@ def _phrase_prohibited(rule: RulebookEntry, ctx: _Ctx) -> None:
                 dedupe_key=("phrase", c.id, normalize(hit)),
             )
     # Safety net: hits in raw text no routed claim covered (extraction misses).
+    # Ratified: safety-net-only detections emit sub-medium needs-verification
+    # findings — the pattern matched but no claim corroborates it.
     for hit in phrase_hits(phrases, ctx.text, match):
         if normalize(hit) not in covered:
             ctx.emit(
                 rule, CheckClass.LEGALITY,
-                f"Prohibited phrase '{hit}' present (safety-net detection)",
-                f"{rule.explanation} Detected in artifact text; no extracted claim covered it.",
+                f"Needs verification: prohibited phrase '{hit}' detected by safety net",
+                f"{rule.explanation} Pattern matched the artifact text but no extracted claim "
+                "corroborates it — verify extraction before treating as a violation.",
+                severity=Severity.LOW,
                 dedupe_key=("phrase", None, normalize(hit)),
             )
 
@@ -211,30 +215,35 @@ def _phrase_conditional(rule: RulebookEntry, ctx: _Ctx) -> None:
     match = p.get("match", "case_insensitive_substring")
     text_plane = p.get("decision_inputs") == "text_plane"
 
-    detections: list[tuple[str, str | None]] = []  # (phrase, claim_id)
+    # (hit, claim_id, via_safety_net): text_plane detections are PRIMARY (the
+    # text IS the decision plane); claim_plane detections are primary when a
+    # routed claim carries the phrase and safety-net otherwise. Ratified:
+    # safety-net-only detections emit at sub-medium severity.
+    detections: list[tuple[str, str | None, bool]] = []
     if text_plane:
-        detections = [(h, None) for h in phrase_hits(phrases, ctx.text, match)]
+        detections = [(h, None, False) for h in phrase_hits(phrases, ctx.text, match)]
     else:
         covered: set[str] = set()
         for c in ctx.routed_claims(rule):
             for hit in phrase_hits(phrases, normalize(c.text), match):
                 covered.add(normalize(hit))
-                detections.append((hit, c.id))
+                detections.append((hit, c.id, False))
         for hit in phrase_hits(phrases, ctx.text, match):  # safety net
             if normalize(hit) not in covered:
-                detections.append((hit, None))
+                detections.append((hit, None, True))
     if not detections:
         return
 
     values = _resolve_condition(p["condition_field"], ctx)
     if values is None:
-        for hit, claim_id in detections:
+        for hit, claim_id, via_net in detections:
             ctx.emit(
                 rule, CheckClass.LEGALITY,
                 f"Needs verification: '{hit}' depends on unverified {p['condition_field']}",
                 f"{rule.explanation} The condition '{p['condition_field']}' is a verification "
-                "input the engine cannot resolve from the offer matrix; verify before approval.",
-                severity=Severity.MEDIUM,
+                "input the engine cannot resolve from the offer matrix; verify before approval."
+                + (" Detected via safety net only (no corroborating claim)." if via_net else ""),
+                severity=Severity.LOW if via_net else Severity.MEDIUM,
                 claim_id=claim_id,
                 dedupe_key=("phrase", claim_id, normalize(hit)),
             )
@@ -242,24 +251,24 @@ def _phrase_conditional(rule: RulebookEntry, ctx: _Ctx) -> None:
 
     violates_when = p.get("violates_when")
     if len(values) == len(ctx.cells) and len(ctx.cells) > 1:
-        # Multi-cell semantics (v2026.08.4): ALL referenced cells violating ->
-        # full-severity violation; NONE -> pass; MIXED -> needs_verification at
-        # medium (the phrase may lawfully describe the non-violating cell —
-        # attribution cannot be decided deterministically).
+        # Multi-cell semantics: ALL referenced cells violating -> full-severity
+        # violation; NONE -> pass; MIXED -> needs_verification BELOW medium
+        # (arbitration: the phrase may lawfully describe the non-violating
+        # cell(s) — attribution cannot be decided deterministically).
         matches = [v == violates_when for v in values]
         if not any(matches):
             return
         if not all(matches):
             mixed_cells = [c.offer_id for c, m in zip(ctx.cells, matches) if m]
             clean_cells = [c.offer_id for c, m in zip(ctx.cells, matches) if not m]
-            for hit, claim_id in detections:
+            for hit, claim_id, via_net in detections:
                 ctx.emit(
                     rule, CheckClass.LEGALITY,
                     f"Needs verification: '{hit}' — mixed referenced offers on {p['condition_field']}",
                     f"{rule.explanation} '{hit}' may refer to the non-violating cell(s) "
                     f"{', '.join(clean_cells)}; cells {', '.join(mixed_cells)} would make it a "
                     "violation. Verify which offer the phrase describes.",
-                    severity=Severity.MEDIUM,
+                    severity=Severity.LOW,
                     claim_id=claim_id,
                     dedupe_key=("phrase", claim_id, normalize(hit)),
                 )
@@ -277,12 +286,15 @@ def _phrase_conditional(rule: RulebookEntry, ctx: _Ctx) -> None:
     if qualifier and _qualifier_cured(qualifier, ctx):
         return  # the cure is proximately present; finding cleared
 
-    for hit, claim_id in detections:
+    for hit, claim_id, via_net in detections:
         ctx.emit(
             rule, CheckClass.TRUTHFULNESS if p["condition_field"] in _OFFER_CONDITION_FIELDS else CheckClass.LEGALITY,
-            f"'{hit}' conflicts with referenced offer ({p['condition_field']})",
+            (f"Needs verification: '{hit}' (safety-net detection) conflicts with referenced offer"
+             if via_net else f"'{hit}' conflicts with referenced offer ({p['condition_field']})"),
             f"{rule.explanation} Offer cells implicated: {', '.join(violating_cells)}."
-            + (f" Required cure absent: {qualifier}." if qualifier else ""),
+            + (f" Required cure absent: {qualifier}." if qualifier else "")
+            + (" Detected via safety net only (no corroborating claim)." if via_net else ""),
+            severity=Severity.LOW if via_net else None,
             claim_id=claim_id,
             suggested_redline=(f"Add: {qualifier}" if qualifier else f"Remove '{hit}' or change the referenced offer."),
             dedupe_key=("phrase", claim_id, normalize(hit)),
@@ -313,14 +325,19 @@ def _trigger_requires_disclosures(rule: RulebookEntry, ctx: _Ctx) -> None:
     if trigger_evidence is None:
         return
 
+    via_net = trigger_claim is None  # ratified: safety-net-only triggers emit sub-medium
     present = {d.disclosure_type for d in ctx.disclosures}
     for dt in required:
         if dt not in present:
             ctx.emit(
                 rule, CheckClass.LEGALITY,
-                f"Missing required disclosure '{dt.value}'",
+                (f"Needs verification: possible missing disclosure '{dt.value}' (safety-net trigger)"
+                 if via_net else f"Missing required disclosure '{dt.value}'"),
                 f"{rule.explanation} Triggered by: \"{trigger_evidence}\"; no extracted "
-                f"disclosure of type '{dt.value}' is present.",
+                f"disclosure of type '{dt.value}' is present."
+                + (" Trigger detected via safety net only (no corroborating claim) — verify "
+                   "extraction before treating as a violation." if via_net else ""),
+                severity=Severity.LOW if via_net else None,
                 claim_id=trigger_claim.id if trigger_claim else None,
                 suggested_redline=f"Add a '{dt.value}' disclosure adjacent to the triggering statement.",
             )
@@ -447,59 +464,31 @@ def _rate_claims(ctx: _Ctx) -> list[Claim]:
     return [c for c in ctx.claims if ClaimType.RATE_OR_APR in c.claim_types]
 
 
-def _resolve_claim_field(field_name: str, ctx: _Ctx) -> list[tuple[object, Claim | None]]:
-    nf = lambda c: c.normalized_fields  # noqa: E731
-    if field_name in ("rate_value", "rate_or_apr_value"):
-        return [(nf(c)["value_pct"], c) for c in _rate_claims(ctx) if nf(c).get("value_pct") is not None]
-    if field_name == "rate_floor":
-        return [
-            (nf(c)["value_pct"], c)
-            for c in _rate_claims(ctx)
-            if nf(c).get("is_floor_claim") and nf(c).get("value_pct") is not None
-        ]
-    if field_name == "amount_value":
-        return [(nf(c)["amount_value"], c) for c in ctx.claims if nf(c).get("amount_value") is not None]
-    if field_name == "term_months":
-        return [
-            (nf(c)["term_months"], c)
-            for c in ctx.claims
-            if ClaimType.TRIGGERING_TERM in c.claim_types and nf(c).get("term_months") is not None
-        ]
-    if field_name == "intro_apr_value":
-        return [
-            (nf(c)["promo_rate_pct"], c)
-            for c in ctx.claims
-            if ClaimType.PROMOTIONAL_OR_INTRODUCTORY in c.claim_types
-            and nf(c).get("promo_rate_pct") is not None
-        ]
-    if field_name == "intro_period_value":
-        return [
-            (nf(c)["promo_period_months"], c)
-            for c in ctx.claims
-            if ClaimType.PROMOTIONAL_OR_INTRODUCTORY in c.claim_types
-            and nf(c).get("promo_period_months") is not None
-        ]
-    if field_name == "post_promo_apr_range":
-        return [
-            ((nf(c)["range_min_pct"], nf(c)["range_max_pct"]), c)
-            for c in _rate_claims(ctx)
-            if nf(c).get("range_min_pct") is not None and nf(c).get("range_max_pct") is not None
-        ]
-    if field_name == "annual_fee_value":
-        return [
-            (nf(c)["amount_value"], c)
-            for c in ctx.claims
-            if ClaimType.FEE_OR_COST in c.claim_types
-            and nf(c).get("fee_type") == "annual_fee"
-            and nf(c).get("amount_value") is not None
-        ]
+def _resolve_claim_field(
+    field_name: str, ctx: _Ctx, claim_filter: dict | None = None
+) -> list[tuple[object, Claim | None]]:
+    """Resolve a composite claim_field to (value, claim) pairs.
+
+    claim_field names come from the payload contract vocabulary (value_pct,
+    promo_rate_pct, term_months, ...) and are read directly off
+    Claim.normalized_fields; `claim_filter` (optional rule parameter) narrows
+    to claims whose payload matches every key (e.g. {"is_floor_claim": true}).
+    Two engine-provided virtual fields exist: review_date (:=
+    submission.date_submitted — the effectivity reference point) and
+    states_targeted (normalized from submission metadata)."""
     if field_name == "review_date":
         return [(ctx.review_date, None)]
     if field_name == "states_targeted":
         return [(ctx.states_targeted, None)]
-    if field_name == "rate_label":
-        return [(None, c) for c in _rate_claims(ctx)]  # not_conflated inspects the claims
-    return []
+    out: list[tuple[object, Claim | None]] = []
+    for c in ctx.claims:
+        nf = c.normalized_fields
+        if field_name not in nf or nf[field_name] is None:
+            continue
+        if claim_filter and any(nf.get(k) != v for k, v in claim_filter.items()):
+            continue
+        out.append((nf[field_name], c))
+    return out
 
 
 def _matrix_bounds(cell: OfferCell, spec: str):
@@ -512,7 +501,7 @@ def _matrix_bounds(cell: OfferCell, spec: str):
 def _ground_truth_consistency(rule: RulebookEntry, ctx: _Ctx, params: dict | None = None) -> None:
     p = params or rule.parameters
     claim_field, matrix_field, comparator = p["claim_field"], p["matrix_field"], p["comparator"]
-    values = _resolve_claim_field(claim_field, ctx)
+    values = _resolve_claim_field(claim_field, ctx, p.get("claim_filter"))
     if not values:
         return  # nothing claimed -> nothing to reconcile
     if not ctx.cells and comparator != "not_conflated":
@@ -571,19 +560,39 @@ def _ground_truth_consistency(rule: RulebookEntry, ctx: _Ctx, params: dict | Non
                     dedupe_key=("gt", rule.rule_id, claim_field, str(value)),
                 )
         elif comparator == "disjoint_from":
-            overlaps = []
-            for c in ctx.cells:
-                excluded = set(getattr(c, matrix_field, []) or [])
-                hit = sorted(excluded & set(value))
-                if hit:
-                    overlaps.append(f"{c.offer_id}: {', '.join(hit)}")
-            if overlaps:
+            # Arbitration semantics: a targeted state is a full-severity leak
+            # only when EVERY referenced cell excludes it; excluded by some but
+            # not all -> sub-medium needs-verification (one available cell may
+            # keep the placement honest there, but attribution is unverified).
+            full, partial = [], []
+            excl_by_cell = [set(getattr(c, matrix_field, []) or []) for c in ctx.cells]
+            for state in value:
+                n = sum(state in e for e in excl_by_cell)
+                if n == len(ctx.cells) and n > 0:
+                    full.append(state)
+                elif n > 0:
+                    partial.append(state)
+            if full:
                 ctx.emit(
                     rule, CheckClass.TRUTHFULNESS,
-                    "Placement targets states the referenced offers exclude",
-                    f"{rule.explanation} Overlaps — {'; '.join(overlaps)}.",
+                    "Placement targets states every referenced offer excludes",
+                    f"{rule.explanation} States excluded by ALL referenced cells: {', '.join(sorted(full))}.",
                     claim_id=cid,
                     suggested_redline="Exclude the listed states from the placement's targeting, or reference offers available there.",
+                )
+            if partial:
+                per = [
+                    f"{c.offer_id}: {', '.join(sorted(e & set(partial)))}"
+                    for c, e in zip(ctx.cells, excl_by_cell) if e & set(partial)
+                ]
+                ctx.emit(
+                    rule, CheckClass.TRUTHFULNESS,
+                    "Needs verification: targeted states excluded by some referenced offers",
+                    f"{rule.explanation} States {', '.join(sorted(partial))} are excluded by some "
+                    f"but not all referenced cells ({'; '.join(per)}); at least one referenced "
+                    "offer remains available there. Verify per-state offer routing before approval.",
+                    severity=Severity.LOW,
+                    claim_id=cid,
                 )
         elif comparator == "not_conflated":
             bare = [
@@ -591,7 +600,7 @@ def _ground_truth_consistency(rule: RulebookEntry, ctx: _Ctx, params: dict | Non
                 if c is not None
                 and not c.normalized_fields.get("labeled_as_apr")
                 and c.normalized_fields.get("rate_kind") == "unlabeled"
-            ]
+            ]  # claim_field is the payload key 'rate_kind'; labeled_as_apr read alongside
             for c in bare:
                 ctx.emit(
                     rule, CheckClass.LEGALITY,
@@ -708,19 +717,22 @@ def _fidelity(
                 )
     if baseline is not None:
         base_keys = {_finding_key(f) for f in baseline.findings}
-        new = [
+        for f in [
             f for f in ctx.findings
             if f.check_class in (CheckClass.LEGALITY, CheckClass.TRUTHFULNESS)
             and _finding_key(f) not in base_keys
-        ]
-        if new:
+        ]:
+            # One fidelity finding PER newly-introduced violation (rule_id=None
+            # by design — the drift itself is engine-level, the underlying rule
+            # is named in the explanation).
             ctx.emit(
                 None, CheckClass.FIDELITY,
-                f"{len(new)} violation(s) present that the approved baseline did not have",
-                f"Relative to the approved baseline ({base_ref}), this capture introduces: "
-                + "; ".join(f"{f.rule_id or 'engine'}: {f.summary}" for f in new)
-                + ". The partner materially changed the placement after approval.",
+                f"Drift vs approved baseline: {f.summary}",
+                f"Relative to the approved baseline ({base_ref}), this capture introduces a "
+                f"violation the approved version did not have ({f.rule_id or 'engine'}: "
+                f"{f.summary}). The partner materially changed the placement after approval.",
                 severity=Severity.CRITICAL,
+                claim_id=f.claim_id,
             )
 
 

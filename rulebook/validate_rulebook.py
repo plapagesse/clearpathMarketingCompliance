@@ -151,7 +151,9 @@ PRIMITIVES: dict[str, dict] = {
             "matrix_field": lambda v: isinstance(v, str),
             "comparator": lambda v: v in COMPARATORS,
         },
-        "optional": {},
+        # claim_filter (v2026.08.4): payload-equality narrowing, e.g.
+        # {"is_floor_claim": true} selects floor claims for the apr_min check.
+        "optional": {"claim_filter": lambda v: isinstance(v, dict) and v},
         "pattern_key": None,
     },
     "numeric_cap_by_state": {
