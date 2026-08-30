@@ -312,8 +312,9 @@ def main() -> int:
                 )):
                     errors.append(f"{owner}: examples.negative needs >=1 {{span, reason}} objects")
             nf = spec.get("normalized_fields")
-            if not (isinstance(nf, dict) and nf):
-                errors.append(f"{owner}: missing/empty normalized_fields")
+            # Empty {} is legal since the payload trim: classify-and-route types carry no fields.
+            if not isinstance(nf, dict):
+                errors.append(f"{owner}: missing normalized_fields (empty {{}} is allowed)")
     else:
         errors.append("missing claim_types_legal_map.json")
 
