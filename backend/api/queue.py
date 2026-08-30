@@ -45,6 +45,14 @@ OFFER_MATRIX_CSV = FIXTURES_DIR / "offer_matrix.csv"
 
 EXCERPT_CHARS = 200
 
+# The judge reads the creative as an image and rules on gray-area questions the
+# deterministic rules cannot settle — net impression, substantiation, whether a
+# fine-print cure really cures the headline. That is the hardest call in the
+# pipeline, so it runs on a frontier model by default; the cheap tier
+# demonstrably found nothing on the net-impression mock the answer key plants a
+# medium judgment finding on. Override per-environment with CLEARPATH_JUDGE_MODEL.
+DEFAULT_JUDGE_MODEL = "claude-sonnet-5"
+
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -259,7 +267,9 @@ def process(sid: str):
     """Run the real pipeline synchronously: extract -> run_checks -> run_judge.
 
     Two live model calls, so this takes 15-40s; the UI holds a processing state
-    rather than us pretending it's fast.
+    rather than us pretending it's fast. The extraction call returns the
+    creative's full text alongside the typed claims and disclosures, so the
+    checker's layout rules run on the real reading order rather than degrading.
     """
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return jsonify({"error": "no API key configured"}), 503
@@ -304,7 +314,10 @@ def process(sid: str):
                 offer_cells=load_offer_matrix(OFFER_MATRIX_CSV),
                 offer_matrix_version="ui",
                 rulebook=rulebook,
-                artifact_text=None,
+                # The creative's own text, transcribed in reading order by the
+                # same extraction call. Without it the layout rules would be
+                # measuring distances inside a concatenation of fragments.
+                artifact_text=extraction.artifact_text or None,
             )
             judged = run_judge(
                 submission=submission,
@@ -312,7 +325,7 @@ def process(sid: str):
                 disclosures=disclosures,
                 evidence_path=str(evidence_path),
                 rulebook=rulebook,
-                model="claude-haiku-4-5",
+                model=os.environ.get("CLEARPATH_JUDGE_MODEL") or DEFAULT_JUDGE_MODEL,
             )
         except Exception as exc:  # noqa: BLE001 — surface any engine/API failure verbatim
             return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502
