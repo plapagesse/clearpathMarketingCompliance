@@ -1,9 +1,10 @@
 """Flask blueprint backing the reviewer input view at /api/review.
 
-Three endpoints, all thin wrappers over the seeded submissions table:
+Four endpoints, all thin wrappers over the seeded submissions table:
   GET  /api/review/submissions            list (optional product/partner/input_type/ai_status)
   POST /api/review/submissions            multipart upload -> new SubmissionRow
   GET  /api/review/evidence/<filename>    serve a screenshot (uploads/, then fixtures/)
+  POST /api/review/reset                  demo only: reseed from fixtures/, wipe uploads
 
 Every listed card carries the same AI-status summary the queue items do (see
 backend/api/common.py), so a reviewer can tell at a glance which inputs the
@@ -33,6 +34,7 @@ from backend.api.common import (
 )
 from backend.contracts import Product, SubmissionMode
 from backend.db.models import SubmissionRow
+from backend.db.seed import seed
 
 review_bp = Blueprint("review", __name__, url_prefix="/api/review")
 
@@ -159,6 +161,40 @@ def create_submission():
         return jsonify(_serialize(session, row)), 201
     finally:
         session.close()
+
+
+# --------------------------------------------------------------------------- #
+# Demo admin
+#
+# Deliberately unauthenticated, and deliberately destructive: this is the button
+# that puts a live walkthrough back to a known state between runs. It must not be
+# exposed anywhere the database holds anything a person would miss.
+# --------------------------------------------------------------------------- #
+
+
+@review_bp.post("/reset")
+def reset():
+    """Drop the schema, reseed from fixtures/, and clear uploaded evidence.
+
+    Reuses the seeder rather than restating it, so a reset lands exactly the
+    state `python -m backend.db.seed` does and inherits any later change to it.
+    Everything a demo accumulates goes with the schema: check runs, findings,
+    review decisions, rule proposals, and submissions uploaded through the UI.
+    """
+    summary = seed()
+
+    # The evidence for those uploaded rows is now unreferenced. Best-effort by
+    # design — a file we cannot unlink is not worth failing the reset over, and
+    # the seeded fixtures live in fixtures/, which this never touches.
+    if UPLOADS_DIR.is_dir():
+        for path in UPLOADS_DIR.iterdir():
+            if path.is_file():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
+    return jsonify({"status": "reset", "submissions": summary["submissions"]})
 
 
 @review_bp.get("/evidence/<path:filename>")

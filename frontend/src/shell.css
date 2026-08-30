@@ -23,3 +23,28 @@
   font-weight: 600;
   box-shadow: inset 0 2px 0 #33518c;
 }
+
+/* Demo tool, not part of the workflow: pushed to the far right and kept quiet,
+   so it reads as furniture rather than a fourth thing to do. */
+.reset-demo {
+  margin-left: auto;
+  align-self: center;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border: 1px solid #dcdfe3;
+  border-radius: 4px;
+  background: transparent;
+  color: #8a8f95;
+  cursor: pointer;
+}
+
+.reset-demo:hover:not(:disabled) {
+  border-color: #c7ccd1;
+  color: #62676d;
+}
+
+.reset-demo:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

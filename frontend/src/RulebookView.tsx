@@ -184,9 +184,10 @@ function RulebookView() {
       </section>
 
       <section>
-        <h2>AI-judged checks</h2>
+        <h2>More judgment-based checks (gray area)</h2>
         <p className="rb-lede">
-          Questions of impression and context, put to a model against the cited authority.
+          Reviewed by the AI against the cited standard — findings are flags for a human, never
+          automatic verdicts.
         </p>
         <RuleList rules={judged} />
       </section>

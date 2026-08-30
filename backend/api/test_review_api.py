@@ -308,6 +308,58 @@ def test_post_rejects_missing_file_and_bad_product(client):
     assert bad_product.status_code == 400
 
 
+def test_reset_restores_the_seeded_fixtures(client, tmp_path):
+    """The demo reset button: back to the manifest, with every trace of a run gone."""
+    from backend.db.models import CheckRunRow, FindingRow, ReviewDecisionRow, SubmissionRow
+    from backend.db.session import get_session
+
+    census = set(_census())
+    checked_id = sorted(census)[0]
+
+    # A demo's worth of accumulated state: an AI run with findings, a reviewer's
+    # decision on it, and an uploaded submission with evidence on disk.
+    _add_check_run(checked_id, ["low", "high"], run_id="cr-reset-test")
+    decided = client.post(
+        f"/api/queue/submission/{checked_id}/decision", json={"decision": "approved"}
+    )
+    assert decided.status_code == 200
+
+    created = client.post(
+        "/api/review/submissions",
+        data={
+            "file": (io.BytesIO(b"upload-bytes"), "shot.png"),
+            "product": "personal_loan",
+            "partner": "acme_partners",
+        },
+        content_type="multipart/form-data",
+    ).get_json()
+    uploaded = tmp_path / "uploads" / f"{created['submission_id']}.png"
+    assert uploaded.is_file()
+    assert _ids(client) == census | {created["submission_id"]}
+
+    response = client.post("/api/review/reset")
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "reset", "submissions": len(census)}
+
+    # The list is exactly the manifest again, and the upload's file went with it.
+    assert _ids(client) == census
+    assert not uploaded.exists()
+
+    # Nothing survives in the tables the demo writes to.
+    session = get_session()
+    try:
+        assert session.query(CheckRunRow).count() == 0
+        assert session.query(FindingRow).count() == 0
+        assert session.query(ReviewDecisionRow).count() == 0
+        assert session.get(SubmissionRow, created["submission_id"]) is None
+        assert session.query(SubmissionRow).count() == len(census)
+    finally:
+        session.close()
+
+    # And the reseeded rows are usable: a fresh run can be recorded again.
+    assert client.get("/api/review/submissions").get_json()[0]["ai_status"] == "unprocessed"
+
+
 def test_evidence_serves_fixtures_and_rejects_traversal(client):
     ok = client.get("/api/review/evidence/mock_pl_card_compliant.png")
     assert ok.status_code == 200
