@@ -1,6 +1,6 @@
 # Fixtures — evidence set for the ClearPath compliance engine
 
-Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inline CSS), the offer matrix they must be checked against, the submission manifest, and the ground-truth answer key.
+Demo/eval inputs: partner placement mocks (self-contained HTML, inline CSS), the offer matrix they must be checked against, the submission manifest, and the ground-truth answer key. Three partners with deliberately different house styles are represented so the demo shows the engine working across creative, not one template: **credit_karma** (white card, blue button, green "Prequalified" chip), **nerdwallet** (off-white editorial review page, serif headline, star-rating row, green buttons), **lendingtree** (dense lead-gen comparison layout, orange header and CTAs, "5 lenders compete" strip).
 
 - `offer_matrix.csv` — ClearPath's current offer cells (version `2026-08`): the truthfulness baseline for every check.
 - `submissions.csv` — one manifest row per mock (context bundle: product, template, offer cells, states, mode, SLA). Columns match `backend/contracts.py::Submission`, including `baseline_submission_id`: the machine-readable fidelity join key, populated only on verification-mode rows and pointing at the pre_publication submission the capture drifted from (empty everywhere else); `change_summary` keeps the human-readable context.
@@ -12,17 +12,23 @@ Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inlin
 
 ## Inventory
 
-| File | Product | Mode | Compliant? | Planted violations |
-|---|---|---|---|---|
-| `mock_pl_card_compliant.html` | personal_loan | pre_publication | ✅ | — |
-| `mock_pl_card_preapproved_guaranteed.html` | personal_loan | pre_publication | ❌ | "Pre-approved" badge on non-firm offer; "guaranteed approval regardless of credit history"; missing not-a-guarantee qualifier |
-| `mock_pl_card_trigger_stale.html` | personal_loan | pre_publication | ❌ | Payment trigger term ($299/mo) w/o Reg Z companion disclosures; APR floor 7.49% not in offer matrix; thin "as low as" qualifier |
-| `mock_pl_card_il_leak.html` | personal_loan | pre_publication | ❌ | 60-mo cell advertised as available in IL despite matrix exclusion (PLPA 36% cap) |
-| `mock_cc_card_compliant.html` | credit_card | pre_publication | ✅ | — |
-| `mock_cc_card_intro_violations.html` | credit_card | pre_publication | ❌ | "0% APR" without "intro" adjacency; post-promo APR buried in 8px footer; "No annual fee / no interest" net-impression fee claim |
-| `mock_cc_prescreen_email_no_optout.html` | credit_card | pre_publication | ❌ | Legit firm offer but FCRA prescreen opt-out notice (short+long) entirely missing |
-| `mock_mtg_table_compliant.html` | mortgage_prequal | pre_publication | ✅ | — |
-| `mock_mtg_arm_as_fixed.html` | mortgage_prequal | pre_publication | ❌ | 5/6 ARM sold as "fixed"; NMLS ID missing; payment shown w/o taxes-&-insurance qualifier |
-| `seed_screenshot_pl_card_drift.html` | personal_loan | **verification** | ❌ | Drift vs approved `mock_pl_card_compliant.html`: APR floor 8.99→7.99 (also matrix-invalid); entire qualifier fine-print paragraph dropped |
+| File | Partner | Product | Mode | Compliant? | Planted violations (rule ids) |
+|---|---|---|---|---|---|
+| `mock_pl_card_compliant.html` | credit_karma | personal_loan | pre_publication | ✅ | — |
+| `mock_pl_card_preapproved_guaranteed.html` | credit_karma | personal_loan | pre_publication | ❌ | "Pre-approved" badge on non-firm offer (`PL-BADGE-001`); "guaranteed approval regardless of credit history" (`XP-UDAAP-001-personal_loan`); missing not-a-guarantee qualifier (`PL-JUDGE-001`) |
+| `mock_pl_card_trigger_stale.html` | credit_karma | personal_loan | pre_publication | ❌ | Payment trigger term ($299/mo) w/o Reg Z companion disclosures (`PL-TRIG-001`); APR floor 7.49% not in offer matrix (`PL-TRUTH-001`); thin "as low as" qualifier (`PL-APR-002`) |
+| `mock_pl_card_il_leak.html` | credit_karma | personal_loan | pre_publication | ❌ | 60-mo cell advertised as available in IL despite matrix exclusion — PLPA 36% cap (`PL-STATE-EXCL-001`) |
+| `mock_cc_card_compliant.html` | credit_karma | credit_card | pre_publication | ✅ | — |
+| `mock_cc_card_intro_violations.html` | credit_karma | credit_card | pre_publication | ❌ | "0% APR" without "intro" adjacency (`CC-INTRO-001`); post-promo APR buried in 8px footer (`CC-INTRO-002`); "No annual fee / no interest" net-impression fee claim (`CC-TRIG-001`, `CC-JUDGE-001`) |
+| `mock_cc_prescreen_email_no_optout.html` | credit_karma | credit_card | pre_publication | ❌ | Legit firm offer but FCRA prescreen opt-out notice (short+long) entirely missing (`CC-PRESCREEN-001`) |
+| `mock_mtg_table_compliant.html` | credit_karma | mortgage_prequal | pre_publication | ✅ | — |
+| `mock_mtg_arm_as_fixed.html` | credit_karma | mortgage_prequal | pre_publication | ❌ | 5/6 ARM sold as "fixed" (`MTG-FIXED-001`); NMLS ID missing (`MTG-NMLS-001`); payment shown w/o taxes-&-insurance qualifier (`MTG-TI-001`) |
+| `mock_nw_pl_review_compliant.html` | nerdwallet | personal_loan | pre_publication | ✅ | — |
+| `mock_nw_cc_forever_bt.html` | nerdwallet | credit_card | pre_publication | ❌ | "0% APR forever on balance transfers" — no intro adjacency (`CC-INTRO-001`) and false permanence / purchases-only cell advertised for transfers (`CC-TRUTH-001`); "risk-free" (`XP-UDAAP-001-credit_card`) |
+| `mock_nw_pl_guaranteed_5min.html` | nerdwallet | personal_loan | pre_publication | ❌ | "Guaranteed approval in 5 minutes" and "no credit check / everyone qualifies" (`XP-UDAAP-001-personal_loan` ×2); "prequalified" with no approval-not-guaranteed qualifier (`XP-PREQ-002-personal_loan`) |
+| `mock_lt_mtg_compare_compliant.html` | lendingtree | mortgage_prequal | pre_publication | ✅ | — |
+| `mock_lt_mtg_preapproved_gov.html` | lendingtree | mortgage_prequal | pre_publication | ❌ | "Pre-approved" on mortgage prequal (`MTG-REGN-001`); "government-backed … FHA and VA loan options" (`MTG-GOV-001`); ARM "fixed for the life of the loan" (`MTG-FIXED-001`) |
+| `mock_lt_cc_row_compliant.html` | lendingtree | credit_card | pre_publication | ✅ | — |
+| `seed_screenshot_pl_card_drift.html` | credit_karma | personal_loan | **verification** | ❌ | Drift vs approved `mock_pl_card_compliant.html`: APR floor 8.99→7.99 (also matrix-invalid); entire qualifier fine-print paragraph dropped |
 
-Notes: every planted violation is literally present (or verifiably absent) in the HTML text and its rendered PNG — `expected_findings.json` has no phantom entries. `submissions.csv` `asset_files` lists `<base>.png;<base>.html` (PNG first = what the platform ingests); `expected_findings.json` stays keyed by the HTML basename — the PNG↔HTML↔key mapping is by basename convention.
+Notes: violating mocks are written against the rulebook's own phrase sources — `rulebook/data/lexicons.json` and `patterns.json` — so the deterministic checker actually fires on them (that is the point of the demo set); compliant mocks are correspondingly written to avoid every lexicon/pattern trigger they do not disclose. Every planted violation is literally present (or verifiably absent) in the HTML text and its rendered PNG — `expected_findings.json` has no phantom entries. `submissions.csv` `asset_files` lists `<base>.png;<base>.html` (PNG first = what the platform ingests); `expected_findings.json` stays keyed by the HTML basename — the PNG↔HTML↔key mapping is by basename convention.

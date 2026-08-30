@@ -253,6 +253,159 @@
       }
     ]
   },
+  "mock_nw_pl_review_compliant.html": {
+    "submission_id": "SUB-2026-0152",
+    "product": "personal_loan",
+    "mode": "pre_publication",
+    "expected_findings": []
+  },
+  "mock_nw_cc_forever_bt.html": {
+    "submission_id": "SUB-2026-0153",
+    "product": "credit_card",
+    "mode": "pre_publication",
+    "expected_findings": [
+      {
+        "rule_area": "regz_intro_adjacency_open_end",
+        "check_class": "legality",
+        "severity": "high",
+        "claim_text": "0% APR forever on balance transfers",
+        "expected_claim_type": "promotional_or_introductory",
+        "expected_rule_ids": [
+          "CC-INTRO-001"
+        ],
+        "expected_normalized_fields": {
+          "promo_rate_pct": 0
+        },
+        "location_note": "headline; the words 'intro' and 'introductory' appear nowhere in the creative",
+        "description": "Promotional rate stated without the term 'intro'/'introductory' in immediate proximity to its listing (Reg Z 1026.16(g)(3)). The post-promo sentence directly below satisfies 1026.16(g)(4) proximity, so CC-INTRO-002 is deliberately NOT planted here — the adjacency failure is isolated."
+      },
+      {
+        "rule_area": "promo_terms_vs_offer_matrix",
+        "check_class": "truthfulness",
+        "severity": "critical",
+        "claim_text": "0% APR forever on balance transfers",
+        "expected_claim_type": "promotional_or_introductory",
+        "expected_rule_ids": [
+          "CC-TRUTH-001"
+        ],
+        "expected_normalized_fields": {
+          "promo_rate_pct": 0
+        },
+        "location_note": "headline; the body line immediately below states the real 15-billing-cycle promotional term",
+        "description": "CC-PLAT's 0% intro APR runs 15 months and applies to PURCHASES ONLY (matrix notes; balance transfers carry a 3% fee and the standard variable APR). The headline advertises the rate as permanent ('forever') and as a balance-transfer rate — neither exists in the current offer matrix."
+      },
+      {
+        "rule_area": "udaap_prohibited_phrase",
+        "check_class": "legality",
+        "severity": "critical",
+        "claim_text": "Transfer your balance risk-free — there is nothing to lose.",
+        "expected_claim_type": "general_udaap_representation",
+        "expected_rule_ids": [
+          "XP-UDAAP-001-credit_card"
+        ],
+        "location_note": "green emphasis line below the post-promotional APR sentence",
+        "description": "'risk-free' is a per-se prohibited phrase in the UDAAP lexicon (FTC Act §5 / 12 U.S.C. 5531). A transfer on this card carries a 3% balance-transfer fee and reverts to a 19.24%-29.24% variable APR, so the representation is false as well as prohibited."
+      }
+    ]
+  },
+  "mock_nw_pl_guaranteed_5min.html": {
+    "submission_id": "SUB-2026-0154",
+    "product": "personal_loan",
+    "mode": "pre_publication",
+    "expected_findings": [
+      {
+        "rule_area": "udaap_guaranteed_approval",
+        "check_class": "legality",
+        "severity": "critical",
+        "claim_text": "Guaranteed approval in 5 minutes — bad credit OK",
+        "expected_claim_type": "approval_or_prequalification",
+        "expected_rule_ids": [
+          "XP-UDAAP-001-personal_loan"
+        ],
+        "location_note": "headline",
+        "description": "'guaranteed approval' is a per-se prohibited approval-certainty phrase wherever any underwriting exists; PL-36-A/PL-60-A both carry a 640 minimum credit score, so approval is plainly conditional (FTC Act §5 / CFPA UDAAP)."
+      },
+      {
+        "rule_area": "udaap_no_credit_check",
+        "check_class": "legality",
+        "severity": "critical",
+        "claim_text": "Get prequalified with no credit check — everyone qualifies.",
+        "expected_claim_type": "approval_or_prequalification",
+        "expected_rule_ids": [
+          "XP-UDAAP-001-personal_loan"
+        ],
+        "location_note": "green subheadline directly under the headline",
+        "description": "Two further per-se prohibited lexicon phrases in one line: 'no credit check' (the flow runs a soft pull and then a hard inquiry) and 'everyone qualifies' (640 minimum score, state exclusions)."
+      },
+      {
+        "rule_area": "missing_not_guaranteed_qualifier",
+        "check_class": "legality",
+        "severity": "high",
+        "claim_text": null,
+        "expected_claim_type": null,
+        "expected_rule_ids": [
+          "XP-PREQ-002-personal_loan"
+        ],
+        "location_note": "creative says 'prequalified' but no approval-not-guaranteed qualifier appears anywhere; the fine print carries only the lender name, the term lengths and the state list",
+        "description": "XP-PREQ-002: whenever the creative says 'prequalified' an approval-not-guaranteed qualifier must be present. It is absent entirely, compounding the approval-certainty headline."
+      }
+    ]
+  },
+  "mock_lt_mtg_compare_compliant.html": {
+    "submission_id": "SUB-2026-0155",
+    "product": "mortgage_prequal",
+    "mode": "pre_publication",
+    "expected_findings": []
+  },
+  "mock_lt_mtg_preapproved_gov.html": {
+    "submission_id": "SUB-2026-0156",
+    "product": "mortgage_prequal",
+    "mode": "pre_publication",
+    "expected_findings": [
+      {
+        "rule_area": "regn_approval_misrepresentation",
+        "check_class": "legality",
+        "severity": "critical",
+        "claim_text": "Pre-approved government-backed loans — rates locked forever",
+        "expected_claim_type": "approval_or_prequalification",
+        "expected_rule_ids": [
+          "MTG-REGN-001"
+        ],
+        "location_note": "headline; the manifest badge_text also reads 'Pre-approved' and the CTA reads 'Claim my pre-approval'",
+        "description": "Reg N 12 CFR 1014.3(q): mortgage prequal creative may never use 'pre-approved' or other approval-certainty language regardless of offer flags — MTG-30F and MTG-ARM both allow only the 'prequalified' designation and neither is a firm offer."
+      },
+      {
+        "rule_area": "regn_government_affiliation",
+        "check_class": "legality",
+        "severity": "high",
+        "claim_text": "Ask about our government-backed programs, including FHA and VA loan options, on a $400,000 loan amount.",
+        "expected_claim_type": "government_affiliation",
+        "expected_rule_ids": [
+          "MTG-GOV-001"
+        ],
+        "location_note": "body line under the fixed-rate claim",
+        "description": "Reg N 12 CFR 1014.3(n): government-program vocabulary ('government-backed', FHA, VA loan) implies agency provision, endorsement or affiliation. Neither referenced cell is a verified government-program loan (government_program_verified is false/unresolved for MTG-30F and MTG-ARM)."
+      },
+      {
+        "rule_area": "regn_arm_as_fixed",
+        "check_class": "legality",
+        "severity": "critical",
+        "claim_text": "Your 5/6 ARM rate is fixed for the life of the loan.",
+        "expected_claim_type": "fixed_rate_representation",
+        "expected_rule_ids": [
+          "MTG-FIXED-001"
+        ],
+        "location_note": "orange emphasis line directly under the headline; reinforced by the headline's 'rates locked forever'",
+        "description": "MTG-ARM is apr_type variable and its matrix notes explicitly forbid describing it as 'fixed' (Reg N 1014.3; Reg Z 1026.24(i)(1)) — the creative states the opposite in terms."
+      }
+    ]
+  },
+  "mock_lt_cc_row_compliant.html": {
+    "submission_id": "SUB-2026-0157",
+    "product": "credit_card",
+    "mode": "pre_publication",
+    "expected_findings": []
+  },
   "seed_screenshot_pl_card_drift.html": {
     "submission_id": "SUB-2026-0151",
     "product": "personal_loan",
