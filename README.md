@@ -51,7 +51,9 @@ _TODO_
 
 ## Deployment
 
-The `Procfile` runs gunicorn with `--threads 8`: the batch AI review fires several
-`/process` requests at once, and a single sync worker would serialize them.
+The `Procfile` runs gunicorn with `--threads 8`: the batch AI review fires one
+`/process` request per selected submission simultaneously, and a single sync
+worker would serialize them. Requests beyond the thread count queue rather than
+fail, so raise `--threads` if reviewers routinely batch more than a handful.
 
 _TODO_

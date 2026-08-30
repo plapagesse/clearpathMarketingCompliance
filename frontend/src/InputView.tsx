@@ -44,9 +44,6 @@ const AI_STATUSES = [
   { value: 'issues', label: 'AI: issues' },
 ]
 
-// Batch reviews in flight at once — bounded to respect API rate limits and keep failures isolated.
-const BATCH_CONCURRENCY = 4
-
 /** The AI fields a /process response carries back onto the card it belongs to. */
 function aiFields(item: SubmissionCard) {
   return {
@@ -76,7 +73,7 @@ function InputView() {
   const [submitting, setSubmitting] = useState(false)
 
   // Batch AI review: which cards are ticked, which ones are being checked now
-  // (several at a time — see BATCH_CONCURRENCY).
+  // (a whole batch is in flight at once, so this is a set, not a single id).
   const [selected, setSelected] = useState<string[]>([])
   const [busyIds, setBusyIds] = useState<string[]>([])
   const [running, setRunning] = useState(false)
@@ -145,21 +142,43 @@ function InputView() {
     setSelected(allSelected ? [] : cards.map((c) => c.submission_id))
   }
 
-  /** One POST per selected card, BATCH_CONCURRENCY at a time. A failure is counted, not fatal. */
+  // What a run would actually POST: the ticked cards the engine has not already
+  // looked at. Re-running a processed card would spend 15-40s to redraw the chip
+  // it is already wearing (its detail view still offers a re-check). Derived once
+  // here, so the button's count and runBatch's work list are the same list — the
+  // label cannot promise a different run than the button performs.
+  const checkedIds = new Set(
+    cards.filter((c) => c.ai_status === 'processed').map((c) => c.submission_id),
+  )
+  const pendingIds = selected.filter((id) => !checkedIds.has(id))
+
+  const batchLabel = running
+    ? 'Running AI review…'
+    : pendingIds.length === 0
+      ? 'Nothing to check'
+      : `Run AI review on ${pendingIds.length} unchecked`
+
+  /** One POST per unchecked selected card, all fired at once. A failure is counted, not fatal. */
   async function runBatch() {
-    const ids = selected
+    const ids = pendingIds
+    const skipped = selected.length - ids.length
+
+    // The button is disabled in this state, so this is a guard rather than a
+    // path the UI offers; it leaves the selection alone to be adjusted.
+    if (ids.length === 0) {
+      setBatchNote('All selected items already checked.')
+      return
+    }
+
     setRunning(true)
     setBatchNote('')
-    setBusyIds([])
+    // Every request starts now, so every card gets its chip now; each one clears
+    // as its own response lands.
+    setBusyIds(ids)
     let failures = 0
-    let next = 0
 
-    // A worker pulls the next id off the shared queue and waits only on its own
-    // request, so one slow (or failing) submission never blocks the others.
-    async function worker() {
-      while (next < ids.length) {
-        const id = ids[next++]
-        setBusyIds((busy) => busy.concat(id))
+    await Promise.all(
+      ids.map(async (id) => {
         try {
           const response = await fetch('/api/queue/submission/' + id + '/process', {
             method: 'POST',
@@ -173,18 +192,20 @@ function InputView() {
           failures += 1
         }
         setBusyIds((busy) => busy.filter((x) => x !== id))
-      }
-    }
+      }),
+    )
 
-    await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, ids.length) }, worker))
+    // "Checked 4 (skipped 2 already-checked, 1 failed)" — the parenthetical
+    // carries only the parts that actually happened.
+    const asides: string[] = []
+    if (skipped) asides.push(`skipped ${skipped} already-checked`)
+    if (failures) asides.push(`${failures} failed`)
 
     setBusyIds([])
     setRunning(false)
     setSelected([])
     setBatchNote(
-      failures === 0
-        ? `Checked ${ids.length} submission${ids.length === 1 ? '' : 's'}.`
-        : `Checked ${ids.length - failures} of ${ids.length} — ${failures} failed.`,
+      `Checked ${ids.length - failures}` + (asides.length ? ` (${asides.join(', ')})` : '') + '.',
     )
   }
 
@@ -449,8 +470,12 @@ function InputView() {
           </button>
           {selected.length > 0 && (
             <>
-              <button className="run-button" onClick={runBatch} disabled={running}>
-                {running ? 'Running AI review…' : `Run AI review on ${selected.length} selected`}
+              <button
+                className="run-button"
+                onClick={runBatch}
+                disabled={running || pendingIds.length === 0}
+              >
+                {batchLabel}
               </button>
               <button className="linkish" onClick={() => setSelected([])} disabled={running}>
                 Clear selection
