@@ -1,0 +1,25 @@
+# Fly.io config — documented alternative to Railway (see DEPLOY.md).
+# app name is set by `fly launch`; keep internal_port in sync with the
+# Dockerfile's EXPOSE/PORT default (8000).
+
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "off"   # keep the demo warm — no cold starts
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "15s"
+  method = "GET"
+  path = "/api/health"
