@@ -6,17 +6,22 @@ expected_claim_type / expected_normalized_fields become Claim objects, the
 mock's fine print is scanned for the disclosures a perfect extractor would
 have found, and the artifact text is the tag-stripped mock HTML.
 
-Run: python -m backend.engine.checker.checker_demo
+Run: python -m backend.engine.checker.checker_demo [--verify]
+
+--verify additionally runs the LLM pass verifier live against the passed
+rules (requires ANTHROPIC_API_KEY; silently skipped otherwise).
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import re
 from pathlib import Path
 
 from backend.contracts import Claim, ClaimType, Disclosure, DisclosureType
-from backend.engine.checker import load_rulebook, run_checks
+from backend.engine.checker import load_rulebook, run_checks, verify_passed_rules
 from backend.ingest.parsers import load_offer_matrix, load_submissions
 
 REPO = Path(__file__).resolve().parents[3]
@@ -32,6 +37,13 @@ _DISCLOSURE_SCANS: list[tuple[DisclosureType, str]] = [
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--verify", action="store_true",
+        help="run the LLM pass verifier on the passed rules (needs ANTHROPIC_API_KEY)",
+    )
+    args = parser.parse_args()
+
     key = json.loads((REPO / "fixtures" / "expected_findings.json").read_text())[MOCK]
     html = (REPO / "fixtures" / MOCK).read_text()
     text = re.sub(r"<[^>]+>", " ", re.sub(r"<!--.*?-->", "", html, flags=re.S))
@@ -83,6 +95,26 @@ def main() -> None:
         if f.suggested_redline:
             print(f"           redline: {f.suggested_redline}")
         print()
+
+    if args.verify:
+        from dotenv import load_dotenv
+
+        load_dotenv(REPO / ".env")
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return  # no key -> skip silently (the demo stays offline-safe)
+        extra = verify_passed_rules(
+            check_run=run,
+            submission=submission,
+            claims=claims,
+            disclosures=disclosures,
+            artifact_text=text,
+            rulebook=rulebook,
+        )
+        print(f"pass verifier: {len(extra)} disputed pass(es)\n")
+        for f in extra:
+            print(f"[{f.severity.value:8s}] {f.rule_id:28s} {f.check_class.value:12s} {f.summary}")
+            print(f"           {f.explanation[:200]}")
+            print()
 
 
 if __name__ == "__main__":
