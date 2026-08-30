@@ -109,6 +109,22 @@ def main() -> int:
         if "compliant" in f and meta["expected_findings"]:
             errors.append(f"compliant fixture has findings: {f}")
 
+    # baseline_submission_id: required join key on verification rows only,
+    # must reference an existing pre_publication submission_id in this file.
+    by_id = {r["submission_id"]: r for r in subs.values()}
+    for r in subs.values():
+        sid, mode = r["submission_id"], r["mode"]
+        baseline = r.get("baseline_submission_id", "").strip()
+        if mode == "verification":
+            if not baseline:
+                errors.append(f"{sid}: verification row missing baseline_submission_id")
+            elif baseline not in by_id:
+                errors.append(f"{sid}: baseline_submission_id '{baseline}' not in manifest")
+            elif by_id[baseline]["mode"] != "pre_publication":
+                errors.append(f"{sid}: baseline '{baseline}' is not a pre_publication row")
+        elif baseline:
+            errors.append(f"{sid}: pre_publication row must leave baseline_submission_id empty")
+
     n_findings = sum(len(m["expected_findings"]) for m in mocks.values())
     if errors:
         print("FAIL")
