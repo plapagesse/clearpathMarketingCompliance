@@ -1,0 +1,41 @@
+{
+  "_description": "Per-DisclosureType detection patterns (case-insensitive regex) matched against a disclosure's own TEXT to derive its LEGAL FUNCTION independently of the label the extractor assigned. The checker unions the extractor's declared type with every type derived here ('effective types') before testing trigger_requires_disclosures membership, so a companion disclosure that is physically present on the creative counts even when the vision model filed it under a neighbouring label (a Reg Z post-intro APR sentence typed as apr_qualifier is still, in law, the trigger companion). Derivation is ADDITIVE and never removes the extractor's own type. Keys are DisclosureType enum values (backend/contracts.py); only types that some rule requires by name need an entry. Patterns are deliberately high-precision: a false derivation silently suppresses a real finding, so each pattern quotes language that only the named legal function uses.",
+  "trigger_disclosure": [
+    "variable\\s(apr|rate)",
+    "adjustable[- ]rate",
+    "\\bprime rate\\b",
+    "rate (and payment )?(can|may|will) (increase|change|adjust)",
+    "(rate )?adjusts? (after|every)",
+    "after (the|that|your) [^.]{0,40}(intro|introductory|promo|promotional)[^.]{0,40}(period|rate|apr)",
+    "(then|thereafter|after that)[^.]{0,40}\\d{1,2}(\\.\\d{1,2})?\\s?%",
+    "post[- ](intro|promo)",
+    "\\d{1,2}(\\.\\d{1,3})?\\s?%\\s?[-–—]\\s?\\d{1,2}(\\.\\d{1,3})?\\s?%",
+    "(annual|balance[- ]transfer|origination|late|cash[- ]advance|maintenance|transfer) fee",
+    "\\bfinance charge\\b",
+    "fee of \\d",
+    "\\d{1,3} (equal )?monthly (payments|installments)",
+    "repayment in [^.]{0,30}(months|installments)"
+  ],
+  "apr_qualifier": [
+    "based on (your )?creditworthiness",
+    "depends? on (your )?credit",
+    "your rate may be higher",
+    "(lowest|best) (apr|rate) requires",
+    "requires (autopay|enrollment|excellent credit)",
+    "rates? (vary|may vary)"
+  ],
+  "not_guaranteed": [
+    "not a guarantee of approval",
+    "does not guarantee approval",
+    "not a loan approval",
+    "not a commitment to lend",
+    "no(t)? guarantee(d)? (of|that you will be) approv",
+    "final terms (depend on|follow) a full application"
+  ],
+  "taxes_insurance": [
+    "exclude(s|d)?[^.]{0,20}taxes and insurance",
+    "(does )?not include[^.]{0,20}taxes",
+    "taxes and insurance are not included",
+    "before taxes and insurance"
+  ]
+}

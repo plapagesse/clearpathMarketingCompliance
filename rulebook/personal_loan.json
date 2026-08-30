@@ -115,12 +115,18 @@
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "value_pct",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "value_pct",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "claim_filter": {
               "is_floor_claim": true
             },
@@ -130,12 +136,19 @@
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "amount_value",
+            "claim_types_any": [
+              "triggering_term"
+            ],
+            "note": "amount_value is shared vocabulary: on a fee_or_cost claim it is the FEE ('a 4% origination fee'), on a Reg Z triggering term it is the sum being advertised ('Borrow $8,800'). Only the latter is reconcilable against the cell's loan-amount range, so the sub-check is scoped to it — otherwise a 4% fee reads as a $4 loan and lands as a critical truthfulness defect. Consequence worth knowing: amount_value lives only in the fee_or_cost payload (backend/contracts.py), so after this scoping the sub-check fires on exactly one shape — a statement that is BOTH a triggering term and carries a stated sum. Giving triggering_term its own amount field would let it read a plain 'Borrow $8,800' too.",
             "matrix_field": "amount_min..amount_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "term_months",
+            "claim_types_any": [
+              "triggering_term"
+            ],
             "matrix_field": "term_months",
             "comparator": "exists_in"
           },
