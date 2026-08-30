@@ -75,7 +75,8 @@
         "decision_inputs": "text_plane",
         "anchor_patterns": "@patterns.promo_rate_mentions",
         "companion_patterns": "@patterns.promo_end_and_post_rate",
-        "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate."
+        "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate.",
+        "companions_require": "all"
       },
       "authorities": [
         {
@@ -284,25 +285,34 @@
         "checks": [
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "intro_apr_value",
+            "claim_field": "promo_rate_pct",
             "matrix_field": "intro_apr_pct",
             "comparator": "equals"
           },
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "intro_period_value",
+            "claim_field": "promo_period_months",
             "matrix_field": "intro_period_months",
             "comparator": "equals"
           },
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "post_promo_apr_range",
+            "claim_field": "range_min_pct",
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "annual_fee_value",
+            "claim_field": "range_max_pct",
+            "matrix_field": "apr_min..apr_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "amount_value",
+            "claim_filter": {
+              "fee_type": "annual_fee"
+            },
             "matrix_field": "annual_fee",
             "comparator": "equals"
           },

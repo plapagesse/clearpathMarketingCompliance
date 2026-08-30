@@ -2,6 +2,7 @@
 # Smoke test: boot Flask, assert /api/health, tear down.
 set -euo pipefail
 cd "$(dirname "$0")"
+.venv/bin/python scripts/generate_contracts_ts.py --check  # contracts codegen freshness gate
 PORT="${PORT:-5001}"
 PORT="$PORT" .venv/bin/python -m backend.app >/dev/null 2>&1 &
 PID=$!

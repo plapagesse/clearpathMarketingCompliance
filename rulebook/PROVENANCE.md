@@ -1,6 +1,6 @@
 # Rulebook Provenance Map
 
-**Where does each rule come from?** Every rule in rulebook v2026.08.3 traces to one
+**Where does each rule come from?** Every rule in rulebook v2026.08.4 traces to one
 of six top-level bodies of law (its *primary* family — the first entry in its
 `authorities` list); rules resting on multiple bodies are cross-referenced. This file
 is **generated** by `rulebook/generate_provenance.py` — do not hand-edit (see Maintenance).
@@ -261,7 +261,7 @@ The ClaimType enum (see `claim_types_legal_map.json`) anchors to the same famili
 
 ## Stats
 
-- Generated from rulebook_version: **2026.08.3**
+- Generated from rulebook_version: **2026.08.4**
 - Total rules: **51**
 - Rules per family (primary): TILA / Regulation Z 17, Regulation N (MAP Rule) 7, FTC Act §5 / CFPA UDAAP deception floor 19, FCRA (Fair Credit Reporting Act) 3, FTC Endorsement Guides 3, State & licensing law (incl. SAFE Act) 2
 - Rules per product: personal_loan 17, credit_card 17, mortgage_prequal 17

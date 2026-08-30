@@ -7,6 +7,11 @@ any mock:
 
     python3 fixtures/render_screenshots.py
 
+Optionally pass explicit sources to render ad-hoc fixtures (any .html path;
+the PNG lands next to each source):
+
+    python3 fixtures/render_screenshots.py path/to/canary.html ...
+
 Uses headless Chrome. Window is 600x1200: 600 wide fits the widest mock
 (the 560px prescreen email card plus default body margins) without
 horizontal cropping; 1200 tall exceeds every mock's content height so
@@ -29,10 +34,17 @@ def main() -> int:
     if not pathlib.Path(CHROME).exists():
         print(f"FAIL: Chrome binary not found at {CHROME}", file=sys.stderr)
         return 1
-    sources = sorted(list(FX.glob("mock_*.html")) + list(FX.glob("seed_*.html")))
-    if not sources:
-        print("FAIL: no mock_*.html / seed_*.html sources found", file=sys.stderr)
-        return 1
+    if len(sys.argv) > 1:
+        sources = [pathlib.Path(a) for a in sys.argv[1:]]
+        bad = [str(s) for s in sources if s.suffix != ".html" or not s.exists()]
+        if bad:
+            print(f"FAIL: not existing .html file(s): {', '.join(bad)}", file=sys.stderr)
+            return 1
+    else:
+        sources = sorted(list(FX.glob("mock_*.html")) + list(FX.glob("seed_*.html")))
+        if not sources:
+            print("FAIL: no mock_*.html / seed_*.html sources found", file=sys.stderr)
+            return 1
     failures = []
     for src in sources:
         out = src.with_suffix(".png")
