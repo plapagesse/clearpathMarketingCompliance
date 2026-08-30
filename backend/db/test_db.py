@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 from backend.contracts import (
     CheckClass,
@@ -39,6 +40,12 @@ def session(tmp_path, monkeypatch):
     s = get_session()
     yield s
     s.close()
+
+
+def test_connect_pragmas_are_applied(session):
+    """Concurrent /process handlers rely on WAL + a busy timeout, set on connect."""
+    assert session.execute(text("PRAGMA journal_mode")).scalar() == "wal"
+    assert session.execute(text("PRAGMA busy_timeout")).scalar() == 5000
 
 
 def test_import_offer_matrix_is_idempotent(session):

@@ -34,6 +34,9 @@ const PRODUCTS = [
   { value: 'mortgage_prequal', label: 'Mortgage prequal' },
 ]
 
+// Batch reviews in flight at once — bounded to respect API rate limits and keep failures isolated.
+const BATCH_CONCURRENCY = 4
+
 /** The AI fields a /process response carries back onto the card it belongs to. */
 function aiFields(item: SubmissionCard) {
   return {
@@ -61,9 +64,10 @@ function InputView() {
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  // Batch AI review: which cards are ticked, which one is being checked now.
+  // Batch AI review: which cards are ticked, which ones are being checked now
+  // (several at a time — see BATCH_CONCURRENCY).
   const [selected, setSelected] = useState<string[]>([])
-  const [busyId, setBusyId] = useState('')
+  const [busyIds, setBusyIds] = useState<string[]>([])
   const [running, setRunning] = useState(false)
   const [batchNote, setBatchNote] = useState('')
 
@@ -128,28 +132,40 @@ function InputView() {
     setSelected(allSelected ? [] : cards.map((c) => c.submission_id))
   }
 
-  /** One POST per selected card, in order. A failure is counted, not fatal. */
+  /** One POST per selected card, BATCH_CONCURRENCY at a time. A failure is counted, not fatal. */
   async function runBatch() {
     const ids = selected
     setRunning(true)
     setBatchNote('')
+    setBusyIds([])
     let failures = 0
+    let next = 0
 
-    for (const id of ids) {
-      setBusyId(id)
-      try {
-        const response = await fetch('/api/queue/submission/' + id + '/process', { method: 'POST' })
-        const body = await response.json()
-        if (!response.ok) throw new Error(body.error || 'processing failed')
-        setCards((all) =>
-          all.map((c) => (c.submission_id === id ? { ...c, ...aiFields(body) } : c)),
-        )
-      } catch {
-        failures += 1
+    // A worker pulls the next id off the shared queue and waits only on its own
+    // request, so one slow (or failing) submission never blocks the others.
+    async function worker() {
+      while (next < ids.length) {
+        const id = ids[next++]
+        setBusyIds((busy) => busy.concat(id))
+        try {
+          const response = await fetch('/api/queue/submission/' + id + '/process', {
+            method: 'POST',
+          })
+          const body = await response.json()
+          if (!response.ok) throw new Error(body.error || 'processing failed')
+          setCards((all) =>
+            all.map((c) => (c.submission_id === id ? { ...c, ...aiFields(body) } : c)),
+          )
+        } catch {
+          failures += 1
+        }
+        setBusyIds((busy) => busy.filter((x) => x !== id))
       }
     }
 
-    setBusyId('')
+    await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, ids.length) }, worker))
+
+    setBusyIds([])
     setRunning(false)
     setSelected([])
     setBatchNote(
@@ -426,7 +442,7 @@ function InputView() {
 
       <div className="grid">
         {cards.map((card) => {
-          const chip = busyId === card.submission_id ? CHECKING_CHIP : aiChip(card)
+          const chip = busyIds.includes(card.submission_id) ? CHECKING_CHIP : aiChip(card)
           return (
             <div
               className="card"

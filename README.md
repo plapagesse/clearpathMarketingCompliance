@@ -51,4 +51,7 @@ _TODO_
 
 ## Deployment
 
+The `Procfile` runs gunicorn with `--threads 8`: the batch AI review fires several
+`/process` requests at once, and a single sync worker would serialize them.
+
 _TODO_
