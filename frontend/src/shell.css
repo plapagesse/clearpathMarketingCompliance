@@ -30,18 +30,19 @@
   margin-left: auto;
   align-self: center;
   font: inherit;
-  font-size: 0.75rem;
-  padding: 3px 10px;
-  border: 1px solid #dcdfe3;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid #b3261e;
   border-radius: 4px;
-  background: transparent;
-  color: #8a8f95;
+  background: #c62828;
+  color: #ffffff;
   cursor: pointer;
 }
 
 .reset-demo:hover:not(:disabled) {
-  border-color: #c7ccd1;
-  color: #62676d;
+  background: #a91f1f;
+  border-color: #8f1a1a;
 }
 
 .reset-demo:disabled {
