@@ -1,0 +1,299 @@
+/* Queue view — plain CSS, three muted colors, no framework. */
+
+.queue {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  color: #1a1f24;
+  background: #ffffff;
+  min-height: 100vh;
+  text-align: left;
+}
+
+.queue .queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+}
+
+/* Form controls get explicit colors: left alone they fall back to the OS
+   system palette and go light-on-light. */
+.queue .queue-bar select {
+  padding: 4px 6px;
+  font-size: 14px;
+  border: 1px solid #c7ccd1;
+  background: #ffffff;
+  color: #1a1f24;
+}
+
+.queue .counter {
+  margin-left: auto;
+  font-size: 18px;
+}
+
+.queue .muted {
+  color: #62676d; /* 5.3:1 on white — muted, still readable */
+}
+
+.queue .small {
+  font-size: 12px;
+}
+
+.queue .error {
+  background: #fdecea;
+  border: 1px solid #e5b3ad;
+  padding: 8px 10px;
+  color: #8a1c12;
+}
+
+/* --- two-pane review: screenshot left, everything else right --- */
+
+.queue .review {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-top: 16px;
+}
+
+.queue .shot-pane {
+  flex: 0 0 60%;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  padding: 8px;
+}
+
+.queue .shot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.queue .side-pane {
+  flex: 1;
+  min-width: 300px;
+}
+
+.queue .ident {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.queue .ident h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.queue .badge {
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.queue .badge-proposed {
+  background: #eef2f7;
+  border-color: #b8c6d8;
+  color: #33506f;
+}
+
+.queue .badge-production {
+  background: #f2eef7;
+  border-color: #c6b8d8;
+  color: #563f6f;
+}
+
+.queue .sla {
+  margin: 6px 0 2px;
+  font-size: 14px;
+}
+
+.queue .sla.overdue {
+  color: #b3261e;
+  font-weight: bold;
+}
+
+.queue .block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+}
+
+.queue .block h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #62676d;
+}
+
+.queue button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid #999;
+  background: #f4f4f4;
+  color: #1a1f24;
+  cursor: pointer;
+}
+
+.queue button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* --- AI status banner --- */
+
+.queue .banner {
+  padding: 10px 12px;
+  border: 1px solid;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.queue .banner-count {
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.queue .banner-quick_check {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+  color: #245c31;
+}
+
+.queue .banner-needs_attention {
+  background: #fdf3e2;
+  border-color: #dfc088;
+  color: #7a5410;
+}
+
+.queue .banner-high_attention {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+/* --- findings --- */
+
+.queue .finding {
+  border-left: 3px solid #ddd;
+  padding: 6px 0 6px 10px;
+  margin-bottom: 12px;
+}
+
+.queue .finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queue .chip {
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.queue .chip-critical,
+.queue .chip-high {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+.queue .chip-medium {
+  background: #fdf3e2;
+  border-color: #dfc088;
+  color: #7a5410;
+}
+
+.queue .chip-low,
+.queue .chip-info {
+  background: #f0f0f0;
+  border-color: #ccc;
+  color: #555;
+}
+
+.queue .rule {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+}
+
+.queue .finding-summary {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.queue .redline {
+  margin: 4px 0;
+  font-size: 13px;
+  background: #f7f7f2;
+  border-left: 2px solid #c9c9b8;
+  padding: 4px 8px;
+}
+
+/* --- history + decision --- */
+
+.queue .history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1a1f24;
+}
+
+.queue .note {
+  font: inherit;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #c7ccd1;
+  background: #ffffff;
+  color: #1a1f24;
+  box-sizing: border-box;
+}
+
+.queue .actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.queue .approve {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+}
+
+.queue .reject {
+  background: #fdecea;
+  border-color: #e5b3ad;
+}
+
+.queue .linkish {
+  border: none;
+  background: none;
+  color: #33506f;
+  text-decoration: underline;
+  padding: 6px 4px;
+}
+
+@media (max-width: 900px) {
+  .queue .review {
+    flex-direction: column;
+  }
+
+  .queue .shot-pane {
+    flex: 1 1 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

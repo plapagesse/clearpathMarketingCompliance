@@ -202,6 +202,23 @@ class CheckRunRow(Base):
         return row
 
 
+class ReviewDecisionRow(Base):
+    """A reviewer's approve/reject call on one submission.
+
+    Additive to the frozen contracts: the queue view treats a submission as
+    reviewed (and drops it from the queue) once a decision row exists.
+    """
+
+    __tablename__ = "review_decisions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    submission_id: Mapped[str] = mapped_column(String, ForeignKey("submissions.id"))
+    decision: Mapped[str] = mapped_column(String)  # "approved" | "rejected"
+    decided_by: Mapped[str] = mapped_column(String, default="reviewer")
+    decided_at: Mapped[datetime] = mapped_column(DateTime)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class FindingRow(Base):
     __tablename__ = "findings"
 
