@@ -16,6 +16,18 @@ costs ~(width*height)/750 input tokens — a typical 800x1200 offer-card
 screenshot ~1.3-1.6K tokens; ~1-2K structured tokens out. About $0.02-0.05
 and 10-40s per artifact.
 
+Enforcement layering (grammar-cap finding): a typed closed union object for
+normalized_fields exceeded the API's compiled-grammar cap for constrained
+decoding at ~36 optional fields — 400 "compiled grammar is too large", twice,
+with and without Literal vocabularies (second failure:
+req_011CeYDZrtfzeYhJmojvF4ZC). The model-facing encoding is therefore
+key/value string pairs (always compiled), and enforcement layers as:
+DECODE = claim/disclosure type enums + structure; VALIDATION + CORRECTIVE
+RETRY = payload keys, types, requiredness, vocabularies
+(validate_claim_payload); PROMPT = vocabularies + requiredness emphasis.
+Empty/whitespace value strings mean "no value" and are dropped in finalize —
+'' can never reach a payload.
+
 Text fidelity note: the literal `text` of claims and disclosures is bounded by
 the vision model's transcription — dashes, quote glyphs, and spacing may
 differ from source text. Downstream matching must use a transcription-tolerant
@@ -32,6 +44,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
@@ -93,14 +106,6 @@ class ExtractionContext(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-def _contains_literal(ann) -> bool:
-    import typing
-
-    if typing.get_origin(ann) is typing.Literal:
-        return True
-    return any(typing.get_origin(a) is typing.Literal for a in typing.get_args(ann))
-
-
 def _literal_values(ann) -> list[str]:
     import typing
 
@@ -113,34 +118,9 @@ def _literal_values(ann) -> list[str]:
     return vals
 
 
-def _build_union_payload_model() -> type[BaseModel]:
-    # GRAMMAR-SIZE NOTE: Literal vocabularies in this model-facing schema blew
-    # the constrained-decoding grammar cap (API 400 "compiled grammar is too
-    # large"), so enum-ish fields are plain str here; the CONTRACT payload
-    # models keep their Literals and vocabulary enforcement lives post-hoc in
-    # validate_claim_payload + the corrective retry. If the grammar still
-    # 400s, the next lever is dropping extra="forbid" — NEVER the numeric
-    # typing (Optional floats/bools are what kill the empty-string class at
-    # decode time).
-    from typing import Optional
-
-    from pydantic import ConfigDict, create_model
-
-    fields: dict = {}
-    for payload_model in CLAIM_TYPE_PAYLOADS.values():
-        for name, info in payload_model.model_fields.items():
-            ann = Optional[str] if _contains_literal(info.annotation) else Optional[info.annotation]
-            if name in fields and fields[name][0] != ann:
-                raise TypeError(
-                    f"payload field collision with conflicting types: {name!r}"
-                )
-            fields[name] = (ann, None)
-    return create_model(
-        "_UnionPayload", __config__=ConfigDict(extra="forbid"), **fields
-    )
-
-
-_UnionPayload = _build_union_payload_model()
+class _NormalizedField(BaseModel):
+    key: str
+    value: str = Field(description="Stringified value: 'true'/'false' for booleans, plain digits for numbers")
 
 
 class _ModelClaim(BaseModel):
@@ -150,12 +130,9 @@ class _ModelClaim(BaseModel):
     )
     text: str = Field(description="VERBATIM span as rendered in the artifact")
     location: str = Field(description="Where in the artifact, e.g. 'headline', 'badge', 'fine print'")
-    normalized_fields: _UnionPayload = Field(  # type: ignore[valid-type]
-        default_factory=_UnionPayload,
-        description=(
-            "Typed payload object — set the fields belonging to the listed claim types; "
-            "leave every inapplicable field null"
-        ),
+    normalized_fields: list[_NormalizedField] = Field(
+        default_factory=list,
+        description="UNION of the payload contracts of every listed claim type, as key/value string pairs",
     )
 
 
@@ -260,11 +237,12 @@ def build_system_prompt(spec: dict) -> str:
         "- Extract every claim, compliant or not; the downstream checker decides compliance.",
         "- Statements about availability, eligibility, or geography (states served, who",
         "  qualifies) ARE claims — always extract them.",
-        "- normalized_fields is a TYPED OBJECT covering the union of every claim type's",
-        "  payload contract. Set the fields belonging to this claim's listed types; fields",
-        "  WITHOUT the '?' suffix are REQUIRED whenever their claim type is listed and",
-        "  must NEVER be omitted — emit them even when the answer is false or 0. Leave every",
-        "  inapplicable field null; never use empty strings for missing values.",
+        "- normalized_fields: key/value pairs covering the union of the listed claim types'",
+        "  payload contracts. Values stringified ('true'/'false' for booleans, plain digits",
+        "  for numbers). Fields WITHOUT the '?' suffix are REQUIRED whenever their claim",
+        "  type is listed and must NEVER be omitted — emit them even when the answer is",
+        "  'false' or '0'. When a field has NO value, OMIT the pair entirely — never emit",
+        "  an empty string.",
         "- Enum-valued fields (use EXACTLY one of the allowed values):",
     ] + [
         f"  - {name}: one of {' | '.join(vals)}"
@@ -311,6 +289,16 @@ def _call_model(client, system: str, content_blocks: list[dict], model: str) -> 
     return out
 
 
+def _coerce(value: str):
+    v = value.strip()
+    if v.lower() in {"true", "false"}:
+        return v.lower() == "true"
+    try:
+        return int(v) if re.fullmatch(r"-?\d+", v) else float(v)
+    except ValueError:
+        return v
+
+
 def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> ExtractionResult:
     claims = [
         Claim(
@@ -319,7 +307,7 @@ def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> Extr
             text=c.text,
             location=c.location,
             source_evidence_id=ctx.evidence_id,
-            normalized_fields={k: v for k, v in c.normalized_fields.model_dump().items() if v is not None},
+            normalized_fields={nf.key: _coerce(nf.value) for nf in c.normalized_fields if nf.value.strip()},
         )
         for i, c in enumerate(raw.claims)
     ]

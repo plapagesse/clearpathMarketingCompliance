@@ -90,7 +90,8 @@ def test_prompt_includes_spec_and_disclosure_enum():
     assert spec["triggering_term"]["definition"][:60] in prompt
     assert "NEGATIVE" in prompt
     assert "ONE claim per distinct statement" in prompt  # multi-label convention (amendment #4)
-    assert "TYPED OBJECT" in prompt  # union payload is a typed closed object now
+    assert "OMIT the pair entirely" in prompt  # empty-value discipline (pairs encoding)
+    assert "rate_kind: one of apr | interest_rate | unlabeled" in prompt  # vocab lines survive
     assert "must NEVER be omitted" in prompt  # required-fields discipline for weaker models
     assert "VISUALLY" in prompt  # image-only prominence instruction
     assert "HTML" not in prompt
@@ -108,8 +109,12 @@ def _fake_raw():
                 claim_types=[ClaimType.RATE_OR_APR],
                 text="APR as low as 8.99%",
                 location="body",
-                normalized_fields={"value_pct": 8.99, "is_floor_claim": True,
-                                   "labeled_as_apr": True, "rate_kind": "apr"},
+                normalized_fields=[
+                    ex._NormalizedField(key="value_pct", value="8.99"),
+                    ex._NormalizedField(key="is_floor_claim", value="true"),
+                    ex._NormalizedField(key="labeled_as_apr", value="true"),
+                    ex._NormalizedField(key="rate_kind", value="apr"),
+                ],
             )
         ],
         disclosures=[
@@ -145,9 +150,14 @@ def test_multilabel_claim_with_union_payload(monkeypatch, png):
                 claim_types=[ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM],
                 text="0% intro APR for 15 months",
                 location="headline",
-                normalized_fields={"promo_rate_pct": 0, "promo_period_months": 15,
-                                   "has_intro_word": True, "is_deferred_interest": False,
-                                   "post_promo_rate_stated": False, "term_months": 15},
+                normalized_fields=[
+                    ex._NormalizedField(key="promo_rate_pct", value="0"),
+                    ex._NormalizedField(key="promo_period_months", value="15"),
+                    ex._NormalizedField(key="has_intro_word", value="true"),
+                    ex._NormalizedField(key="is_deferred_interest", value="false"),
+                    ex._NormalizedField(key="post_promo_rate_stated", value="false"),
+                    ex._NormalizedField(key="term_months", value="15"),
+                ],
             )
         ],
         disclosures=[],
@@ -324,7 +334,7 @@ def test_invalid_payload_joins_retry_path(monkeypatch, png):
         calls["n"] += 1
         if calls["n"] == 1:
             bad = _fake_raw()
-            bad.claims[0].normalized_fields.rate_kind = None  # drop a required field
+            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
             return bad
         return _fake_raw()
 
@@ -394,7 +404,7 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
         seen_blocks.append(blocks)
         if len(seen_blocks) == 1:
             bad = _fake_raw()
-            bad.claims[0].normalized_fields.rate_kind = None  # drop a required field
+            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
             return bad
         return _fake_raw()
 
@@ -406,7 +416,7 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
     texts2 = [b.get("text", "") for b in seen_blocks[1] if b.get("type") == "text"]
     assert not any("failed validation" in t for t in texts1)
     corrective = [t for t in texts2 if "failed validation" in t]
-    assert corrective and "rate_kind" in corrective[0]
+    assert corrective and "bogus_key" in corrective[0]
     assert "Re-emit the complete corrected extraction" in corrective[0]
 
 
@@ -415,55 +425,32 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
 # --------------------------------------------------------------------------- #
 
 
-def test_union_model_covers_payload_models_exactly():
-    """Drift discipline: _UnionPayload's field names must exactly cover the
-    union of the 9 contract payload models; types must match EXCEPT the one
-    sanctioned widening — Literal-in-contract <-> str-in-union (grammar-size
-    cap; vocabulary enforcement is post-hoc). Assert the mapping explicitly so
-    it cannot silently widen further."""
-    from typing import Optional
-
-    expected: dict = {}
-    for model in CLAIM_TYPE_PAYLOADS.values():
-        for name, info in model.model_fields.items():
-            ann = Optional[str] if ex._contains_literal(info.annotation) else Optional[info.annotation]
-            assert expected.get(name, ann) == ann, f"conflicting types for {name}"
-            expected[name] = ann
-    assert set(ex._UnionPayload.model_fields) == set(expected)
-    sanctioned_str_fields = set()
-    for model in CLAIM_TYPE_PAYLOADS.values():
-        for name, info in model.model_fields.items():
-            if ex._contains_literal(info.annotation):
-                sanctioned_str_fields.add(name)
-    assert sanctioned_str_fields == {
-        "rate_kind", "strength", "fee_claim_kind", "fee_type", "representation_kind"
-    }  # the ONLY fields allowed to be str-widened
-    for name, ann in expected.items():
-        union_ann = Optional[ex._UnionPayload.model_fields[name].annotation]
-        assert union_ann == ann, name
-        if name not in sanctioned_str_fields:
-            assert union_ann != Optional[str] or ann == Optional[str], name
-    # closed object: extras forbidden -> phantom keys impossible at decode time
-    with pytest.raises(ValidationError):
-        ex._UnionPayload(bogus_key=1)
-
-
-def test_union_model_rejects_empty_string_for_float():
-    """The Haiku failure mode: '' for an optional float must be rejected at the
-    schema layer, never reach a payload."""
-    with pytest.raises(ValidationError):
-        ex._UnionPayload(odds_value_pct="")
-    with pytest.raises(ValidationError):
-        ex._ModelClaim(claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
-                       text="x", location="y",
-                       normalized_fields={"odds_value_pct": ""})
-    # None and absent are both fine and both drop out in finalize
-    c = ex._ModelClaim(claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
-                       text="x", location="y",
-                       normalized_fields={"badge_word": "prequalified", "strength": "prequalified",
-                                          "odds_value_pct": None})
-    dumped = {k: v for k, v in c.normalized_fields.model_dump().items() if v is not None}
-    assert "odds_value_pct" not in dumped and dumped["badge_word"] == "prequalified"
+def test_empty_value_pairs_are_dropped(monkeypatch, png):
+    """The observed Haiku failure: odds_value_pct emitted as '' — an empty or
+    whitespace-only value string means "no value": the pair is dropped in
+    finalize, never reaching a payload, and the claim validates."""
+    raw = ex._ModelExtraction(
+        claims=[
+            ex._ModelClaim(
+                claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
+                text="You're prequalified",
+                location="badge",
+                normalized_fields=[
+                    ex._NormalizedField(key="badge_word", value="prequalified"),
+                    ex._NormalizedField(key="strength", value="prequalified"),
+                    ex._NormalizedField(key="odds_value_pct", value=""),
+                    ex._NormalizedField(key="fixed_period_stated", value="   "),
+                ],
+            )
+        ],
+        disclosures=[],
+    )
+    monkeypatch.setattr(ex, "_call_model", lambda client, system, blocks, model: raw)
+    ctx = ex.ExtractionContext(product=Product.PERSONAL_LOAN, evidence_id="t7")
+    result = ex.extract(png, ctx, client=object())
+    nf = result.claims[0].normalized_fields
+    assert "odds_value_pct" not in nf and "fixed_period_stated" not in nf
+    assert nf == {"badge_word": "prequalified", "strength": "prequalified"}
 
 
 def test_spec_prose_never_references_undeclared_fields():
