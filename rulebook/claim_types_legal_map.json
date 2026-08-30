@@ -83,7 +83,7 @@
     }
    ],
    "note": "12 CFR 1026.24(b)-(c); mortgage presentation also 1026.24(f); open-end analogues in 1026.16.",
-   "definition": "A span stating a NUMERIC rate of credit — a percentage figure presented as the cost of borrowing, whether labeled APR, labeled as an interest rate, or unlabeled. Includes floors ('as low as 8.99%') and ranges ('8.99-35.99% APR'). A rate adjective without a figure ('low rates') is not this type; a promotional rate is emitted as promotional_or_introductory AND as rate_or_apr (two claims).",
+   "definition": "A span stating a NUMERIC rate of credit — a percentage figure presented as the cost of borrowing, whether labeled APR, labeled as an interest rate, or unlabeled. Includes floors ('as low as 8.99%') and ranges ('8.99-35.99% APR'). A rate adjective without a figure ('low rates') is not this type; a promotional rate yields ONE claim listing both promotional_or_introductory and rate_or_apr in its claim_types (multi-label).",
    "examples": {
     "positive": [
      "APR as low as 8.99%",
@@ -534,7 +534,7 @@
       "geographic_availability",
       "other"
      ],
-     "description": "one of the allowed values",
+     "description": "the material-representation category this residual UDAAP claim asserts — which kind of statement it is (e.g. geographic availability, savings claim, urgency device, comparative superlative)",
      "optional": false
     },
     "amount_value": {
