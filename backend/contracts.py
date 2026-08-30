@@ -141,6 +141,7 @@ class TriggeringTermPayload(BaseModel):
     term_months: int | None = None
     downpayment: float | None = None
     finance_charge: float | None = None
+    downpayment_is_pct: bool | None = None
 
 
 class RateOrAprPayload(BaseModel):
@@ -180,6 +181,7 @@ class FeeOrCostPayload(BaseModel):
         "annual_fee", "origination_fee", "closing_costs", "balance_transfer_fee", "other"
     ] | None = None
     amount_value: float | None = None
+    amount_is_pct: bool | None = None
 
 
 class EndorsementOrTestimonialPayload(BaseModel):

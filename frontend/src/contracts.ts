@@ -60,6 +60,7 @@ export interface TriggeringTermPayload {
   term_months?: number | null
   downpayment?: number | null
   finance_charge?: number | null
+  downpayment_is_pct?: boolean | null
 }
 export interface RateOrAprPayload {
   value_pct?: number | null
@@ -89,6 +90,7 @@ export interface FeeOrCostPayload {
   fee_claim_kind: 'absence_of_fee' | 'specific_fee_amount' | 'fee_disclosure'
   fee_type?: 'annual_fee' | 'origination_fee' | 'closing_costs' | 'balance_transfer_fee' | 'other' | null
   amount_value?: number | null
+  amount_is_pct?: boolean | null
 }
 export interface EndorsementOrTestimonialPayload {
   endorser_named: boolean
