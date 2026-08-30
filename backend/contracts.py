@@ -9,10 +9,13 @@ change out explicitly. See CONTRACTS.md.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from enum import Enum
+from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 
 # --------------------------------------------------------------------------- #
@@ -29,9 +32,9 @@ class Product(str, Enum):
 class ClaimType(str, Enum):
     """Legal-entity taxonomy: each value names the body of law that governs the claim.
 
-    A text span embodying two legal categories yields two Claim objects (extractor
-    convention — no multi-label claims). Anchors documented in CONTRACTS.md and
-    rulebook/claim_types_legal_map.json.
+    Claims are MULTI-LABEL (amendment #4): one statement = one Claim object,
+    carrying every legal category it embodies in `claim_types`. Anchors
+    documented in CONTRACTS.md and rulebook/claim_types_legal_map.json.
     """
 
     TRIGGERING_TERM = "triggering_term"                          # Reg Z 1026.24(d) / 1026.16(b)
@@ -104,10 +107,113 @@ class Claim(BaseModel):
     """One marketing claim extracted from an evidence artifact."""
 
     id: str
-    claim_type: ClaimType
+    claim_types: list[ClaimType] = Field(
+        min_length=1,
+        description=(
+            "Every legal category this statement embodies (amendment #4: one "
+            "statement = one claim object; a span embodying multiple legal "
+            "categories lists them all — the old two-objects convention is REPLACED)"
+        ),
+    )
     text: str = Field(description="Verbatim claim text as rendered")
     location: str = Field(description="Where in the artifact (e.g. 'headline', 'fine print', 'badge')")
     source_evidence_id: str
+    normalized_fields: dict = Field(
+        default_factory=dict,
+        description=(
+            "Amendment #5: union of the payload contracts of every listed claim "
+            "type — typed per CLAIM_TYPE_PAYLOADS; validate with validate_claim_payload()"
+        ),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Claim-type payload models (amendment #5, derived)
+#
+# SINGLE SOURCE OF TRUTH: rulebook/claim_types_legal_map.json. The payload
+# models are GENERATED here at import time from that file's structured
+# normalized_fields entries (type number->float, boolean->bool, string->str;
+# "values" -> Literal[...]; optional -> Optional[...] = None). Edit the map,
+# never the models.
+# --------------------------------------------------------------------------- #
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_LEGAL_MAP_PATH = _REPO_ROOT / "rulebook" / "claim_types_legal_map.json"
+
+_PAYLOAD_PY_TYPES: dict[str, type] = {"number": float, "boolean": bool, "string": str}
+
+
+def _build_payload_models(map_path: Path = _LEGAL_MAP_PATH) -> dict[ClaimType, type[BaseModel]]:
+    if not map_path.exists():
+        raise FileNotFoundError(
+            f"claim-type payload source of truth not found: {map_path} "
+            "(rulebook/claim_types_legal_map.json is required to import contracts)"
+        )
+    spec = json.loads(map_path.read_text())["claim_types"]
+    registry: dict[ClaimType, type[BaseModel]] = {}
+    for ct in ClaimType:
+        if ct.value not in spec:
+            raise ValueError(f"{map_path.name} has no entry for claim type {ct.value!r}")
+        fields: dict = {}
+        for name, fs in spec[ct.value]["normalized_fields"].items():
+            if not isinstance(fs, dict) or "type" not in fs or "optional" not in fs:
+                raise ValueError(
+                    f"malformed normalized_fields entry {ct.value}.{name}: "
+                    f"expected {{type, optional, description[, values]}}, got {fs!r}"
+                )
+            if fs.get("values"):
+                base = Literal[tuple(fs["values"])]
+            elif fs["type"] in _PAYLOAD_PY_TYPES:
+                base = _PAYLOAD_PY_TYPES[fs["type"]]
+            else:
+                raise ValueError(
+                    f"malformed normalized_fields entry {ct.value}.{name}: unknown type {fs['type']!r}"
+                )
+            if fs["optional"]:
+                fields[name] = (base | None, None)
+            else:
+                fields[name] = (base, ...)
+        model_name = "".join(w.capitalize() for w in ct.value.split("_")) + "Payload"
+        registry[ct] = create_model(model_name, **fields)
+    return registry
+
+
+CLAIM_TYPE_PAYLOADS: dict[ClaimType, type[BaseModel]] = _build_payload_models()
+
+
+def validate_claim_payload(claim: Claim) -> None:
+    """Union-semantics payload validation (amendment #5).
+
+    Every key in normalized_fields must belong to at least one listed claim
+    type's payload model (raises ValueError on unknown keys), and for each
+    listed type its required fields must be present and type-valid (raises
+    pydantic.ValidationError via the payload model)."""
+    known: set[str] = set()
+    for ct in claim.claim_types:
+        known |= set(CLAIM_TYPE_PAYLOADS[ct].model_fields)
+    unknown = set(claim.normalized_fields) - known
+    if unknown:
+        raise ValueError(
+            f"claim {claim.id}: normalized_fields keys {sorted(unknown)} belong to none of "
+            f"the listed claim types {[ct.value for ct in claim.claim_types]}"
+        )
+    for ct in claim.claim_types:
+        model = CLAIM_TYPE_PAYLOADS[ct]
+        subset = {k: v for k, v in claim.normalized_fields.items() if k in model.model_fields}
+        model.model_validate(subset)
+    # Contract-level CROSS-FIELD check (the map format declares fields one at a
+    # time and cannot express either/or requirements): a rate_or_apr claim must
+    # carry a single figure (value_pct) OR a full range (range_min_pct AND
+    # range_max_pct) — e.g. "Rates from 11.49% to 35.99%" is range-only.
+    if ClaimType.RATE_OR_APR in claim.claim_types:
+        nf = claim.normalized_fields
+        has_value = nf.get("value_pct") is not None
+        has_range = nf.get("range_min_pct") is not None and nf.get("range_max_pct") is not None
+        if not (has_value or has_range):
+            raise ValueError(
+                f"claim {claim.id}: rate claim requires value_pct or a range "
+                "(range_min_pct + range_max_pct)"
+            )
 
 
 class Disclosure(BaseModel):

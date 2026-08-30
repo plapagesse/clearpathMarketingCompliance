@@ -1,372 +1,400 @@
 {
-  "description": "Definition document AND classification spec for the ClaimType enum in backend/contracts.py — kept 1:1 with it. Each value is a LEGAL-ENTITY category naming the body of law that governs the claim. This file is injected into the Stage-3 extractor's prompt (definition + examples steer classification) and read by the Stage-4 checker. normalized_fields is a CONTRACT between extractor and checker: when the extractor emits a Claim of a given type, it guarantees these payload fields (fields marked '?' are present when determinable, else null); claim_plane rule predicates consume exactly these fields. Extractor convention: a text span embodying two legal categories yields two Claim objects (no multi-label).",
-  "claim_types": {
-    "triggering_term": {
-      "legal_concept": "Reg Z 'triggering terms' — payment amounts, number of payments, repayment periods, downpayments, finance-charge amounts (closed-end) and their open-end analogues incl. negative claims — whose presence obligates companion disclosures",
-      "authorities": [
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.24(d)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
-        },
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.16(b)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
-        }
-      ],
-      "note": "12 CFR 1026.24(d) (closed-end) / 1026.16(b) (open-end). Statutorily defined trigger mechanics.",
-      "definition": "A span stating a SPECIFIC numeric cost-of-credit term: a payment amount, a number of payments or repayment period, a downpayment amount or percentage, or a finance-charge amount. Specificity is the test: a concrete figure or period qualifies; a general or absence-based statement does not. Open-end (card) analogues include negative fee claims ('no annual fee'), which trigger under 1026.16(b) even though absence-based closed-end statements do not.",
-      "examples": {
-        "positive": [
-          "$509/mo for 36 months",
-          "Only 5% down",
-          "Repayment in as many as 36 monthly installments"
-        ],
-        "negative": [
-          {
-            "span": "No downpayment required",
-            "reason": "per the official interpretation of 1026.24(d)(1), absence statements like 'no downpayment' do not trigger — the provision applies only if a downpayment is actually required"
-          },
-          {
-            "span": "9.99% APR",
-            "reason": "per the official interpretation, a statement of the APR alone is not a triggering term (it is a rate_or_apr claim instead)"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "payment_amount?": "number — dollar payment per period, if stated",
-        "num_payments?": "integer — number of payments, if stated",
-        "term_months?": "integer — repayment period normalized to months, if stated",
-        "downpayment?": "number — downpayment amount or percentage, if stated (with downpayment_is_pct flag)",
-        "finance_charge?": "number — finance-charge dollar amount, if stated"
-      }
+ "description": "Definition document AND classification spec for the ClaimType enum in backend/contracts.py — kept 1:1 with it, and the SINGLE SOURCE OF TRUTH for claim payloads. Each value is a LEGAL-ENTITY category naming the body of law that governs the claim. This file is injected into the Stage-3 extractor's prompt (definition + examples steer classification) and read by the Stage-4 checker. Extractor convention (multi-label): one Claim per distinct statement, listing EVERY legal category it embodies in claim_types. normalized_fields is a CONTRACT between extractor and checker: structured typed declarations {type, values, optional, description} from which the pydantic payload models in backend/contracts.py are GENERATED at import (edit this map, never the models); required fields (optional: false) are guaranteed whenever their claim type is listed, optional fields are present when determinable; claim_plane rule predicates consume exactly these fields.",
+ "claim_types": {
+  "triggering_term": {
+   "legal_concept": "Reg Z 'triggering terms' — payment amounts, number of payments, repayment periods, downpayments, finance-charge amounts (closed-end) and their open-end analogues incl. negative claims — whose presence obligates companion disclosures",
+   "authorities": [
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.24(d)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
     },
-    "rate_or_apr": {
-      "legal_concept": "Rate representations: advertised rates must be stated and labeled as an annual percentage rate, with prominence rules for simple rates",
-      "authorities": [
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.24(b)-(c)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
-        }
-      ],
-      "note": "12 CFR 1026.24(b)-(c); mortgage presentation also 1026.24(f); open-end analogues in 1026.16.",
-      "definition": "A span stating a NUMERIC rate of credit — a percentage figure presented as the cost of borrowing, whether labeled APR, labeled as an interest rate, or unlabeled. Includes floors ('as low as 8.99%') and ranges ('8.99-35.99% APR'). A rate adjective without a figure ('low rates') is not this type; a promotional rate is emitted as promotional_or_introductory AND as rate_or_apr (two claims).",
-      "examples": {
-        "positive": [
-          "APR as low as 8.99%",
-          "6.250% interest rate (6.41% APR)",
-          "Rates from 11.49% to 35.99%"
-        ],
-        "negative": [
-          {
-            "span": "Low rates for qualified borrowers",
-            "reason": "no numeric figure — not a rate statement under 1026.24(b)-(c), and not an APR-labeling issue; classify as general_udaap_representation if it makes a measurable comparative claim, else no claim"
-          },
-          {
-            "span": "Save 20% on fees this month",
-            "reason": "a percentage that is not a cost-of-credit rate"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "value_pct?": "number — the single rate figure, if one value stated",
-        "range_min_pct?": "number — low end, if a range is stated",
-        "range_max_pct?": "number — high end, if a range is stated",
-        "is_floor_claim": "boolean — true for 'as low as'/'from'/'starting at' framing",
-        "labeled_as_apr": "boolean — true if the figure carries the APR label",
-        "rate_kind": "enum: apr | interest_rate | unlabeled — how the figure is presented (serves the not_conflated comparator)"
-      }
-    },
-    "promotional_or_introductory": {
-      "legal_concept": "Promotional/introductory rate and deferred-interest representations, with adjacency and proximity requirements",
-      "authorities": [
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.16(g)-(h)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
-        }
-      ],
-      "note": "12 CFR 1026.16(g) (promotional rates) and 1026.16(h) (deferred interest).",
-      "definition": "A span offering a temporary rate or interest holiday: an introductory/promotional rate (typically 0% or reduced, for a stated period) or a deferred-interest offer ('no interest if paid in full in N months'). The span qualifies when a rate or interest treatment is presented as time-limited or conditional on payoff; the same figure also yields a rate_or_apr claim.",
-      "examples": {
-        "positive": [
-          "0% intro APR for 15 months",
-          "No interest if paid in full in 12 months",
-          "1.9% promotional rate through December"
-        ],
-        "negative": [
-          {
-            "span": "Limited-time offer: apply by Friday",
-            "reason": "time-limits the OFFER, not a rate — urgency device (general_udaap_representation), not a promotional-rate representation"
-          },
-          {
-            "span": "8.99% APR with autopay discount",
-            "reason": "a conditional discount, not a temporary promotional period — rate_or_apr only"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "promo_rate_pct": "number — the promotional rate figure (0 for 0%)",
-        "promo_period_months?": "integer — promo duration in months, if stated",
-        "has_intro_word": "boolean — 'intro'/'introductory' adjacent to this span",
-        "is_deferred_interest": "boolean — true for 'no interest if paid in full' structures",
-        "post_promo_rate_stated": "boolean — the go-to rate (or range) appears in the creative"
-      }
-    },
-    "fixed_rate_representation": {
-      "legal_concept": "'Fixed' rate representations — permitted only for rates that genuinely cannot increase (or with a stated fixed period); banned for variable/adjustable products",
-      "authorities": [
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.16(f)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
-        },
-        {
-          "body": "Regulation N (MAP Rule)",
-          "citation": "12 CFR § 1014.3",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
-        }
-      ],
-      "note": "12 CFR 1026.16(f) (open-end); Reg N 12 CFR 1014.3 and Reg Z 1026.24(i)(1) (mortgage).",
-      "definition": "A span applying the word 'fixed' (or an equivalent immutability claim like 'your rate will never change') to a credit product's RATE or payment. The word 'fixed' applied to something other than the rate/payment of the credit product does not qualify.",
-      "examples": {
-        "positive": [
-          "Fixed 6.25% APR for the life of the loan",
-          "Lock in a fixed monthly payment",
-          "Your rate will never go up"
-        ],
-        "negative": [
-          {
-            "span": "Stay on a fixed monthly budget",
-            "reason": "'fixed' modifies the consumer's budget, not the product's rate or payment — not a rate representation"
-          },
-          {
-            "span": "We fixed our fee schedule in 2024",
-            "reason": "'fixed' as verb about the lender's pricing history, not an immutability claim about the offered rate"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "applies_to_rate": "boolean — true when 'fixed'/immutability modifies the product's rate or payment",
-        "fixed_period_stated?": "string — the stated period during which the rate is fixed, if any (null = unbounded claim)"
-      }
-    },
-    "approval_or_prequalification": {
-      "legal_concept": "Approval and likelihood-of-approval representations: 'pre-approved' gated by the FCRA firm offer of credit; mortgage approval-likelihood misrepresentation banned by Reg N",
-      "authorities": [
-        {
-          "body": "Fair Credit Reporting Act",
-          "citation": "15 U.S.C. § 1681a(l)",
-          "regime": "statute",
-          "regulator": "CFPB",
-          "url": "https://www.law.cornell.edu/uscode/text/15/1681a"
-        },
-        {
-          "body": "Regulation N (MAP Rule)",
-          "citation": "12 CFR § 1014.3(q)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
-        }
-      ],
-      "note": "FCRA 603(l), 15 USC 1681a(l) (firm offer definition); Reg N 12 CFR 1014.3(q). 'Prequalified' has no statutory definition — its boundaries are enforcement doctrine (FTC v. Credit Karma).",
-      "definition": "A span representing the consumer's approval status or likelihood of approval: pre-approved/prequalified badges, guarantee-of-approval language, numeric or qualitative approval odds. Process descriptions (how to apply, how fast) are not approval claims unless they assert an outcome.",
-      "examples": {
-        "positive": [
-          "You're pre-approved!",
-          "90%+ approval odds for members like you",
-          "Guaranteed approval regardless of credit"
-        ],
-        "negative": [
-          {
-            "span": "Apply in minutes",
-            "reason": "describes the application process, asserts nothing about the outcome — not an approval claim"
-          },
-          {
-            "span": "Checking your rate won't affect your credit score",
-            "reason": "a credit-pull mechanics claim (general_udaap_representation / soft_pull_claim), not an approval representation"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "badge_word": "string — the operative term as rendered ('pre-approved', 'prequalified', 'guaranteed', ...)",
-        "strength": "enum: guaranteed | pre_approved | prequalified | odds_numeric | odds_qualitative | invitation — descending assertiveness of the outcome claim",
-        "odds_value_pct?": "number — the numeric odds figure, when strength=odds_numeric"
-      }
-    },
-    "fee_or_cost": {
-      "legal_concept": "Fee and cost-of-credit representations against the TILA finance-charge concept; 'no fees' claims judged under deception doctrine",
-      "authorities": [
-        {
-          "body": "Regulation Z (Truth in Lending Act)",
-          "citation": "12 CFR § 1026.4",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/4/"
-        },
-        {
-          "body": "Regulation N (MAP Rule)",
-          "citation": "12 CFR § 1014.3(c)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
-        }
-      ],
-      "note": "TILA/Reg Z 12 CFR 1026.4 (finance charge); Reg N 12 CFR 1014.3(c) (mortgage fee/cost misrepresentation). 'No hidden fees' style claims have no statutory test — anchor is UDAAP/FTC Section 5 net impression.",
-      "definition": "A span representing the presence, absence, or amount of a fee or non-rate cost of the product: 'no hidden fees', '$0 annual fee', 'origination fee of 1-8%', 'no closing costs'. Note the asymmetry: absence-of-fee claims are NOT closed-end triggering terms (per interp-24), but 'no annual fee' IS an open-end trigger — the checker resolves that via CC-TRIG-001; this type just normalizes the fee claim itself.",
-      "examples": {
-        "positive": [
-          "No hidden fees",
-          "$0 annual fee",
-          "An origination fee of 1-8% is deducted from proceeds"
-        ],
-        "negative": [
-          {
-            "span": "$509/mo",
-            "reason": "a payment amount (triggering_term), not a fee representation"
-          },
-          {
-            "span": "Save thousands over the life of your loan",
-            "reason": "a savings outcome claim (general_udaap_representation), not a statement about a fee"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "fee_claim_kind": "enum: absence_of_fee | specific_fee_amount | fee_disclosure — asserting no fees, stating a fee figure, or disclosing fee mechanics",
-        "fee_type?": "enum: annual_fee | origination_fee | closing_costs | balance_transfer_fee | other — which fee, if identifiable",
-        "amount_value?": "number — the fee amount or percentage, if stated (with amount_is_pct flag)"
-      }
-    },
-    "endorsement_or_testimonial": {
-      "legal_concept": "Endorsements and testimonials: honest-opinion requirement, material-connection disclosure, generally-achievable results",
-      "authorities": [
-        {
-          "body": "FTC Endorsement Guides",
-          "citation": "16 CFR § 255.0",
-          "regime": "agency_guide",
-          "regulator": "FTC",
-          "url": "https://www.law.cornell.edu/cfr/text/16/255.0"
-        }
-      ],
-      "note": "16 CFR 255.0 (definitions), 255.1 (advertiser liability/monitoring), 255.5 (material connections). FTC guides interpreting Section 5 — doctrine formalized as guidance, not standalone statute.",
-      "definition": "A span presenting a third party's opinion, experience, or results with the product: quoted customers, influencer statements, star ratings presented as user sentiment. The advertiser's own first-person marketing voice is not an endorsement; a named or implied outside voice is.",
-      "examples": {
-        "positive": [
-          "\"ClearPath cut my monthly payments in half!\" — Jessica M.",
-          "Rated 4.8/5 by over 40,000 borrowers",
-          "@moneywithmarcus says this is the card to beat"
-        ],
-        "negative": [
-          {
-            "span": "We think you'll love our simple application",
-            "reason": "advertiser's own voice — no third-party endorser"
-          },
-          {
-            "span": "As seen on national TV",
-            "reason": "a media-placement claim, not a third party endorsing the product (general_udaap_representation if implying endorsement)"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "endorser_named": "boolean — an identifiable person/handle is attached",
-        "material_connection_disclosed": "boolean — compensation/relationship disclosure present in the same span or immediately adjacent",
-        "atypical_result_claimed": "boolean — a specific outcome (savings, rewards, score change) is asserted",
-        "result_claim_text?": "string — the asserted outcome, verbatim, if any"
-      }
-    },
-    "government_affiliation": {
-      "legal_concept": "Representations of government provision, endorsement, or affiliation in mortgage marketing",
-      "authorities": [
-        {
-          "body": "Regulation N (MAP Rule)",
-          "citation": "12 CFR § 1014.3(n)",
-          "regime": "regulation",
-          "regulator": "CFPB",
-          "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
-        }
-      ],
-      "note": "Reg N 12 CFR 1014.3(n). Outside mortgage, government-affiliation implications fall to general deception doctrine.",
-      "definition": "A span invoking a government agency, program, or official status in connection with the product: FHA/VA/HUD references, 'government-backed', official-notice framing. Includes truthful program references (they still require verification) and implied affiliation through trade dress or 'official' vocabulary.",
-      "examples": {
-        "positive": [
-          "FHA loans with as little as 3.5% down",
-          "Official notice: your property qualifies for a government refinance program",
-          "Backed by the full faith of federal programs"
-        ],
-        "negative": [
-          {
-            "span": "We comply with all federal lending regulations",
-            "reason": "a compliance statement, not a claim of government provision, endorsement, or affiliation"
-          },
-          {
-            "span": "NMLS #1902441",
-            "reason": "a mandated licensing identifier, not an affiliation claim (it is a Disclosure, not a Claim)"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "agency_or_program?": "string — the named agency/program (FHA, VA, HUD, ...), if any",
-        "is_program_reference": "boolean — true when referencing a real loan program (FHA/VA product)",
-        "affiliation_implied": "boolean — true when the framing implies the sender IS or REPRESENTS a government entity ('official notice')"
-      }
-    },
-    "general_udaap_representation": {
-      "legal_concept": "Residual category: any other representation reachable as a deceptive act or practice — urgency devices, comparative/superlative claims, amount-offered claims, savings claims, soft-pull claims, debt-elimination claims",
-      "authorities": [
-        {
-          "body": "Consumer Financial Protection Act (UDAAP)",
-          "citation": "12 U.S.C. § 5531",
-          "regime": "statute",
-          "regulator": "CFPB",
-          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
-        },
-        {
-          "body": "FTC Act Section 5",
-          "citation": "15 U.S.C. § 45(a)",
-          "regime": "statute",
-          "regulator": "FTC",
-          "url": "https://www.law.cornell.edu/uscode/text/15/45"
-        }
-      ],
-      "note": "No statutory definition by design — FTC Act Section 5 and CFPA Section 1031 supply the standard (misleads or likely to mislead; reasonable interpretation; material). Urgency and comparison claims specifically have no statutory test; their treatment is deception doctrine. Amount-offered claims ('up to $50,000') live here because a bare amount is not a Reg Z triggering term per interp-24, yet still needs truthfulness reconciliation.",
-      "definition": "The residual type for material representations governed only by the general deception standard. The extractor sets representation_kind to the closest sub-kind: urgency devices, measurable comparative/superlative claims, amount-offered claims, savings/outcome claims, soft-pull (credit-score-impact) claims, debt-elimination claims, geographic-availability claims. Non-material puffery ('great service') yields no claim at all.",
-      "examples": {
-        "positive": [
-          "Borrow up to $50,000",
-          "Offer expires today — act now",
-          "Checking your rate won't affect your credit score"
-        ],
-        "negative": [
-          {
-            "span": "Friendly service from a team that cares",
-            "reason": "non-material puffery — no reasonable consumer takes it as a measurable claim; emit no claim"
-          },
-          {
-            "span": "0% intro APR for 15 months",
-            "reason": "governed by a specific legal regime (promotional_or_introductory + rate_or_apr), not the residual"
-          }
-        ]
-      },
-      "normalized_fields": {
-        "representation_kind": "enum: urgency_device | comparative_superlative | amount_offered | savings_claim | soft_pull_claim | debt_elimination | geographic_availability | other",
-        "amount_value?": "number — the offered amount, when representation_kind=amount_offered (serves PL-TRUTH-001 amount reconciliation)",
-        "claimed_deadline?": "string — the stated/implied expiry, when representation_kind=urgency_device (serves XP-URG-004)",
-        "comparative_is_measurable?": "boolean — superlative asserts a verifiable market fact, when representation_kind=comparative_superlative"
-      }
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.16(b)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
     }
+   ],
+   "note": "12 CFR 1026.24(d) (closed-end) / 1026.16(b) (open-end). Statutorily defined trigger mechanics.",
+   "definition": "A span stating a SPECIFIC numeric cost-of-credit term: a payment amount, a number of payments or repayment period, a downpayment amount or percentage, or a finance-charge amount. Specificity is the test: a concrete figure or period qualifies; a general or absence-based statement does not. Open-end (card) analogues include negative fee claims ('no annual fee'), which trigger under 1026.16(b) even though absence-based closed-end statements do not.",
+   "examples": {
+    "positive": [
+     "$509/mo for 36 months",
+     "Only 5% down",
+     "Repayment in as many as 36 monthly installments"
+    ],
+    "negative": [
+     {
+      "span": "No downpayment required",
+      "reason": "per the official interpretation of 1026.24(d)(1), absence statements like 'no downpayment' do not trigger — the provision applies only if a downpayment is actually required"
+     },
+     {
+      "span": "9.99% APR",
+      "reason": "per the official interpretation, a statement of the APR alone is not a triggering term (it is a rate_or_apr claim instead)"
+     }
+    ]
+   },
+   "normalized_fields": {
+    "term_months": {
+     "type": "number",
+     "description": "repayment period normalized to months, if stated (integer)",
+     "optional": true
+    }
+   }
+  },
+  "rate_or_apr": {
+   "legal_concept": "Rate representations: advertised rates must be stated and labeled as an annual percentage rate, with prominence rules for simple rates",
+   "authorities": [
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.24(b)-(c)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
+    }
+   ],
+   "note": "12 CFR 1026.24(b)-(c); mortgage presentation also 1026.24(f); open-end analogues in 1026.16.",
+   "definition": "A span stating a NUMERIC rate of credit — a percentage figure presented as the cost of borrowing, whether labeled APR, labeled as an interest rate, or unlabeled. Includes floors ('as low as 8.99%') and ranges ('8.99-35.99% APR'). A rate adjective without a figure ('low rates') is not this type; a promotional rate yields ONE claim listing both promotional_or_introductory and rate_or_apr in its claim_types (multi-label).",
+   "examples": {
+    "positive": [
+     "APR as low as 8.99%",
+     "6.250% interest rate (6.41% APR)",
+     "Rates from 11.49% to 35.99%"
+    ],
+    "negative": [
+     {
+      "span": "Low rates for qualified borrowers",
+      "reason": "no numeric figure — not a rate statement under 1026.24(b)-(c), and not an APR-labeling issue; classify as general_udaap_representation if it makes a measurable comparative claim, else no claim"
+     },
+     {
+      "span": "Save 20% on fees this month",
+      "reason": "a percentage that is not a cost-of-credit rate"
+     }
+    ]
+   },
+   "normalized_fields": {
+    "value_pct": {
+     "type": "number",
+     "description": "the single rate figure; for floor claims the floor value. A rate claim must carry value_pct OR a range (range_min_pct + range_max_pct); range-only claims omit it",
+     "optional": true
+    },
+    "range_min_pct": {
+     "type": "number",
+     "description": "low end, if a range is stated",
+     "optional": true
+    },
+    "range_max_pct": {
+     "type": "number",
+     "description": "high end, if a range is stated",
+     "optional": true
+    },
+    "is_floor_claim": {
+     "type": "boolean",
+     "description": "true for 'as low as'/'from'/'starting at' framing; absent means false",
+     "optional": true
+    },
+    "labeled_as_apr": {
+     "type": "boolean",
+     "description": "true if the figure carries the APR label; absent means false",
+     "optional": true
+    },
+    "rate_kind": {
+     "type": "string",
+     "values": [
+      "apr",
+      "interest_rate",
+      "unlabeled"
+     ],
+     "description": "how the figure is presented (serves the not_conflated comparator)",
+     "optional": true
+    }
+   }
+  },
+  "promotional_or_introductory": {
+   "legal_concept": "Promotional/introductory rate and deferred-interest representations, with adjacency and proximity requirements",
+   "authorities": [
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.16(g)-(h)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+    }
+   ],
+   "note": "12 CFR 1026.16(g) (promotional rates) and 1026.16(h) (deferred interest).",
+   "definition": "A span offering a temporary rate or interest holiday: an introductory/promotional rate (typically 0% or reduced, for a stated period) or a deferred-interest offer ('no interest if paid in full in N months'). The span qualifies when a rate or interest treatment is presented as time-limited or conditional on payoff; the same figure also yields a rate_or_apr claim.",
+   "examples": {
+    "positive": [
+     "0% intro APR for 15 months",
+     "No interest if paid in full in 12 months",
+     "1.9% promotional rate through December"
+    ],
+    "negative": [
+     {
+      "span": "Limited-time offer: apply by Friday",
+      "reason": "time-limits the OFFER, not a rate — urgency device (general_udaap_representation), not a promotional-rate representation"
+     },
+     {
+      "span": "8.99% APR with autopay discount",
+      "reason": "a conditional discount, not a temporary promotional period — rate_or_apr only"
+     }
+    ]
+   },
+   "normalized_fields": {
+    "promo_rate_pct": {
+     "type": "number",
+     "description": "the promotional rate figure (0 for 0%); omit for deferred-interest promos with no rate",
+     "optional": true
+    },
+    "promo_period_months": {
+     "type": "number",
+     "description": "promo duration in months, if stated (integer)",
+     "optional": true
+    }
+   }
+  },
+  "fixed_rate_representation": {
+   "legal_concept": "'Fixed' rate representations — permitted only for rates that genuinely cannot increase (or with a stated fixed period); banned for variable/adjustable products",
+   "authorities": [
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.16(f)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/16/"
+    },
+    {
+     "body": "Regulation N (MAP Rule)",
+     "citation": "12 CFR § 1014.3",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
+    }
+   ],
+   "note": "12 CFR 1026.16(f) (open-end); Reg N 12 CFR 1014.3 and Reg Z 1026.24(i)(1) (mortgage).",
+   "definition": "A span applying the word 'fixed' (or an equivalent immutability claim like 'your rate will never change') to a credit product's RATE or payment. The word 'fixed' applied to something other than the rate/payment of the credit product does not qualify.",
+   "examples": {
+    "positive": [
+     "Fixed 6.25% APR for the life of the loan",
+     "Lock in a fixed monthly payment",
+     "Your rate will never go up"
+    ],
+    "negative": [
+     {
+      "span": "Stay on a fixed monthly budget",
+      "reason": "'fixed' modifies the consumer's budget, not the product's rate or payment — not a rate representation"
+     },
+     {
+      "span": "We fixed our fee schedule in 2024",
+      "reason": "'fixed' as verb about the lender's pricing history, not an immutability claim about the offered rate"
+     }
+    ]
+   },
+   "normalized_fields": {}
+  },
+  "approval_or_prequalification": {
+   "legal_concept": "Approval and likelihood-of-approval representations: 'pre-approved' gated by the FCRA firm offer of credit; mortgage approval-likelihood misrepresentation banned by Reg N",
+   "authorities": [
+    {
+     "body": "Fair Credit Reporting Act",
+     "citation": "15 U.S.C. § 1681a(l)",
+     "regime": "statute",
+     "regulator": "CFPB",
+     "url": "https://www.law.cornell.edu/uscode/text/15/1681a"
+    },
+    {
+     "body": "Regulation N (MAP Rule)",
+     "citation": "12 CFR § 1014.3(q)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
+    }
+   ],
+   "note": "FCRA 603(l), 15 USC 1681a(l) (firm offer definition); Reg N 12 CFR 1014.3(q). 'Prequalified' has no statutory definition — its boundaries are enforcement doctrine (FTC v. Credit Karma).",
+   "definition": "A span representing the consumer's approval status or likelihood of approval: pre-approved/prequalified badges, guarantee-of-approval language, numeric or qualitative approval odds. Process descriptions (how to apply, how fast) are not approval claims unless they assert an outcome.",
+   "examples": {
+    "positive": [
+     "You're pre-approved!",
+     "90%+ approval odds for members like you",
+     "Guaranteed approval regardless of credit"
+    ],
+    "negative": [
+     {
+      "span": "Apply in minutes",
+      "reason": "describes the application process, asserts nothing about the outcome — not an approval claim"
+     },
+     {
+      "span": "Checking your rate won't affect your credit score",
+      "reason": "a credit-pull mechanics claim (general_udaap_representation / soft_pull_claim), not an approval representation"
+     }
+    ]
+   },
+   "normalized_fields": {}
+  },
+  "fee_or_cost": {
+   "legal_concept": "Fee and cost-of-credit representations against the TILA finance-charge concept; 'no fees' claims judged under deception doctrine",
+   "authorities": [
+    {
+     "body": "Regulation Z (Truth in Lending Act)",
+     "citation": "12 CFR § 1026.4",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/4/"
+    },
+    {
+     "body": "Regulation N (MAP Rule)",
+     "citation": "12 CFR § 1014.3(c)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
+    }
+   ],
+   "note": "TILA/Reg Z 12 CFR 1026.4 (finance charge); Reg N 12 CFR 1014.3(c) (mortgage fee/cost misrepresentation). 'No hidden fees' style claims have no statutory test — anchor is UDAAP/FTC Section 5 net impression.",
+   "definition": "A span representing the presence, absence, or amount of a fee or non-rate cost of the product: 'no hidden fees', '$0 annual fee', 'origination fee of 1-8%', 'no closing costs'. Note the asymmetry: absence-of-fee claims are NOT closed-end triggering terms (per interp-24), but 'no annual fee' IS an open-end trigger — the checker resolves that via CC-TRIG-001; this type just normalizes the fee claim itself.",
+   "examples": {
+    "positive": [
+     "No hidden fees",
+     "$0 annual fee",
+     "An origination fee of 1-8% is deducted from proceeds"
+    ],
+    "negative": [
+     {
+      "span": "$509/mo",
+      "reason": "a payment amount (triggering_term), not a fee representation"
+     },
+     {
+      "span": "Save thousands over the life of your loan",
+      "reason": "a savings outcome claim (general_udaap_representation), not a statement about a fee"
+     }
+    ]
+   },
+   "normalized_fields": {
+    "fee_type": {
+     "type": "string",
+     "values": [
+      "annual_fee",
+      "origination_fee",
+      "closing_costs",
+      "balance_transfer_fee",
+      "other"
+     ],
+     "description": "which fee, if identifiable",
+     "optional": true
+    },
+    "amount_value": {
+     "type": "number",
+     "description": "the fee amount or percentage, if stated",
+     "optional": true
+    }
+   }
+  },
+  "endorsement_or_testimonial": {
+   "legal_concept": "Endorsements and testimonials: honest-opinion requirement, material-connection disclosure, generally-achievable results",
+   "authorities": [
+    {
+     "body": "FTC Endorsement Guides",
+     "citation": "16 CFR § 255.0",
+     "regime": "agency_guide",
+     "regulator": "FTC",
+     "url": "https://www.law.cornell.edu/cfr/text/16/255.0"
+    }
+   ],
+   "note": "16 CFR 255.0 (definitions), 255.1 (advertiser liability/monitoring), 255.5 (material connections). FTC guides interpreting Section 5 — doctrine formalized as guidance, not standalone statute.",
+   "definition": "A span presenting a third party's opinion, experience, or results with the product: quoted customers, influencer statements, star ratings presented as user sentiment. The advertiser's own first-person marketing voice is not an endorsement; a named or implied outside voice is.",
+   "examples": {
+    "positive": [
+     "\"ClearPath cut my monthly payments in half!\" — Jessica M.",
+     "Rated 4.8/5 by over 40,000 borrowers",
+     "@moneywithmarcus says this is the card to beat"
+    ],
+    "negative": [
+     {
+      "span": "We think you'll love our simple application",
+      "reason": "advertiser's own voice — no third-party endorser"
+     },
+     {
+      "span": "As seen on national TV",
+      "reason": "a media-placement claim, not a third party endorsing the product (general_udaap_representation if implying endorsement)"
+     }
+    ]
+   },
+   "normalized_fields": {}
+  },
+  "government_affiliation": {
+   "legal_concept": "Representations of government provision, endorsement, or affiliation in mortgage marketing",
+   "authorities": [
+    {
+     "body": "Regulation N (MAP Rule)",
+     "citation": "12 CFR § 1014.3(n)",
+     "regime": "regulation",
+     "regulator": "CFPB",
+     "url": "https://www.law.cornell.edu/cfr/text/12/1014.3"
+    }
+   ],
+   "note": "Reg N 12 CFR 1014.3(n). Outside mortgage, government-affiliation implications fall to general deception doctrine.",
+   "definition": "A span invoking a government agency, program, or official status in connection with the product: FHA/VA/HUD references, 'government-backed', official-notice framing. Includes truthful program references (they still require verification) and implied affiliation through trade dress or 'official' vocabulary.",
+   "examples": {
+    "positive": [
+     "FHA loans with as little as 3.5% down",
+     "Official notice: your property qualifies for a government refinance program",
+     "Backed by the full faith of federal programs"
+    ],
+    "negative": [
+     {
+      "span": "We comply with all federal lending regulations",
+      "reason": "a compliance statement, not a claim of government provision, endorsement, or affiliation"
+     },
+     {
+      "span": "NMLS #1902441",
+      "reason": "a mandated licensing identifier, not an affiliation claim (it is a Disclosure, not a Claim)"
+     }
+    ]
+   },
+   "normalized_fields": {}
+  },
+  "general_udaap_representation": {
+   "legal_concept": "Residual category: any other representation reachable as a deceptive act or practice — urgency devices, comparative/superlative claims, amount-offered claims, savings claims, soft-pull claims, debt-elimination claims",
+   "authorities": [
+    {
+     "body": "Consumer Financial Protection Act (UDAAP)",
+     "citation": "12 U.S.C. § 5531",
+     "regime": "statute",
+     "regulator": "CFPB",
+     "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+    },
+    {
+     "body": "FTC Act Section 5",
+     "citation": "15 U.S.C. § 45(a)",
+     "regime": "statute",
+     "regulator": "FTC",
+     "url": "https://www.law.cornell.edu/uscode/text/15/45"
+    }
+   ],
+   "note": "No statutory definition by design — FTC Act Section 5 and CFPA Section 1031 supply the standard (misleads or likely to mislead; reasonable interpretation; material). Urgency and comparison claims specifically have no statutory test; their treatment is deception doctrine. Amount-offered claims ('up to $50,000') live here because a bare amount is not a Reg Z triggering term per interp-24, yet still needs truthfulness reconciliation.",
+   "definition": "The residual type for material representations governed only by the general deception standard. Typical sub-kinds: urgency devices, measurable comparative/superlative claims, amount-offered claims, savings/outcome claims, soft-pull (credit-score-impact) claims, debt-elimination claims, geographic-availability claims. Non-material puffery ('great service') yields no claim at all.",
+   "examples": {
+    "positive": [
+     "Borrow up to $50,000",
+     "Offer expires today — act now",
+     "Checking your rate won't affect your credit score",
+     "Available in all states except IA and WV — geographic/eligibility availability statements are material representations (state-availability misstatements are a real enforcement class)"
+    ],
+    "negative": [
+     {
+      "span": "Friendly service from a team that cares",
+      "reason": "non-material puffery — no reasonable consumer takes it as a measurable claim; emit no claim"
+     },
+     {
+      "span": "0% intro APR for 15 months",
+      "reason": "governed by a specific legal regime (promotional_or_introductory + rate_or_apr), not the residual"
+     }
+    ]
+   },
+   "normalized_fields": {}
   }
+ }
 }
