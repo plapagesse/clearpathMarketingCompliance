@@ -109,7 +109,10 @@ def test_curly_apostrophes_normalize_to_straight(rulebook, real_cells):
     claim = make_claim(
         "Your application can’t be denied",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION, ClaimType.GENERAL_UDAAP_REPRESENTATION],
-        {"badge_word": "can’t be denied", "strength": "guaranteed"},
+        # arbitrated: claim must satisfy the payload contract; normalization
+        # intent unchanged.
+        {"badge_word": "can’t be denied", "strength": "guaranteed",
+         "representation_kind": "other"},
     )
     result = run(
         rulebook,
