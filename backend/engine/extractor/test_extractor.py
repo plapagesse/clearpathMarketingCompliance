@@ -283,18 +283,41 @@ def test_workspace_header_on_identity_linked_key(monkeypatch):
 from backend.contracts import CLAIM_TYPE_PAYLOADS, validate_claim_payload  # noqa: E402
 
 
-def test_payload_registry_matches_spec():
-    """Drift discipline: each payload model's field set == the spec's
-    normalized_fields names for that type, required-ness matching '?' suffix."""
-    spec = ex.load_classification_spec()
-    assert set(CLAIM_TYPE_PAYLOADS) == set(ClaimType)
-    for ct, model in CLAIM_TYPE_PAYLOADS.items():
-        spec_fields = spec[ct.value]["normalized_fields"]
-        expected_names = {k.rstrip("?") for k in spec_fields}
-        assert set(model.model_fields) == expected_names, ct.value
-        for k in spec_fields:
-            name, optional = k.rstrip("?"), k.endswith("?")
-            assert model.model_fields[name].is_required() == (not optional), f"{ct.value}.{name}"
+def test_payload_models_constructed_from_spec():
+    """Amendment #5a: models derive from the map at import. Registry complete,
+    spot-checks against an independent read of the spec file, malformed spec
+    entries produce clear construction errors."""
+    import json as _json
+    from pathlib import Path
+
+    from backend.contracts import _build_payload_models
+
+    assert set(CLAIM_TYPE_PAYLOADS) == set(ClaimType) and len(CLAIM_TYPE_PAYLOADS) == 9
+    spec = _json.loads((Path(__file__).resolve().parents[3] /
+                        "rulebook" / "claim_types_legal_map.json").read_text())["claim_types"]
+    # spot-check 1: rate_or_apr — names, requiredness, Literal vocabulary
+    m = CLAIM_TYPE_PAYLOADS[ClaimType.RATE_OR_APR]
+    assert m.__name__ == "RateOrAprPayload"
+    assert set(m.model_fields) == set(spec["rate_or_apr"]["normalized_fields"])
+    for name, fs in spec["rate_or_apr"]["normalized_fields"].items():
+        assert m.model_fields[name].is_required() == (not fs["optional"]), name
+    import typing
+    assert set(typing.get_args(m.model_fields["rate_kind"].annotation)) ==         set(spec["rate_or_apr"]["normalized_fields"]["rate_kind"]["values"])
+    # spot-check 2: triggering_term — all optional, numbers are floats
+    tt = CLAIM_TYPE_PAYLOADS[ClaimType.TRIGGERING_TERM]
+    assert all(not fi.is_required() for fi in tt.model_fields.values())
+    # spot-check 3: promotional — promo_rate_pct required
+    assert CLAIM_TYPE_PAYLOADS[ClaimType.PROMOTIONAL_OR_INTRODUCTORY].model_fields["promo_rate_pct"].is_required()
+    # malformed spec -> clear error
+    bad = {"claim_types": {ct.value: {"normalized_fields": {}} for ct in ClaimType}}
+    bad["claim_types"]["rate_or_apr"]["normalized_fields"] = {"x": {"type": "wat", "optional": True, "description": "d"}}
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        _json.dump(bad, f)
+    with pytest.raises(ValueError, match="unknown type 'wat'"):
+        _build_payload_models(Path(f.name))
+    with pytest.raises(FileNotFoundError, match="claim_types_legal_map.json"):
+        _build_payload_models(Path("/nonexistent/claim_types_legal_map.json"))
 
 
 def _claim(types, nf):
@@ -471,7 +494,7 @@ def test_spec_prose_never_references_undeclared_fields():
     for ct in ClaimType:
         t = spec[ct.value]
         model = CLAIM_TYPE_PAYLOADS[ct]
-        allowed = {k.rstrip("?") for k in t["normalized_fields"]} | ALLOWLIST
+        allowed = set(t["normalized_fields"]) | ALLOWLIST
         allowed |= {c.value for c in ClaimType}  # cross-references to sibling types are legitimate
         for info in model.model_fields.values():
             for arg in typing.get_args(info.annotation):
@@ -479,7 +502,7 @@ def test_spec_prose_never_references_undeclared_fields():
                     if isinstance(lit, str):
                         allowed.add(lit)
         prose = [("definition", t["definition"])]
-        prose += [(f"normalized_fields.{k}", v) for k, v in t["normalized_fields"].items()]
+        prose += [(f"normalized_fields.{k}", v["description"]) for k, v in t["normalized_fields"].items()]
         for where, text in prose:
             for tok in token_re.findall(text):
                 if tok not in allowed:

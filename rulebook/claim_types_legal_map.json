@@ -39,12 +39,36 @@
     ]
    },
    "normalized_fields": {
-    "payment_amount?": "number — dollar payment per period, if stated",
-    "num_payments?": "integer — number of payments, if stated",
-    "term_months?": "integer — repayment period normalized to months, if stated",
-    "downpayment?": "number — downpayment amount or percentage, if stated",
-    "finance_charge?": "number — finance-charge dollar amount, if stated",
-    "downpayment_is_pct?": "boolean — true when the stated downpayment is a percentage rather than a dollar amount"
+    "payment_amount": {
+     "type": "number",
+     "description": "dollar payment per period, if stated",
+     "optional": true
+    },
+    "num_payments": {
+     "type": "number",
+     "description": "number of payments, if stated (integer)",
+     "optional": true
+    },
+    "term_months": {
+     "type": "number",
+     "description": "repayment period normalized to months, if stated (integer)",
+     "optional": true
+    },
+    "downpayment": {
+     "type": "number",
+     "description": "downpayment amount or percentage, if stated",
+     "optional": true
+    },
+    "finance_charge": {
+     "type": "number",
+     "description": "finance-charge dollar amount, if stated",
+     "optional": true
+    },
+    "downpayment_is_pct": {
+     "type": "boolean",
+     "description": "true when the stated downpayment is a percentage rather than a dollar amount",
+     "optional": true
+    }
    }
   },
   "rate_or_apr": {
@@ -78,12 +102,41 @@
     ]
    },
    "normalized_fields": {
-    "value_pct?": "number — the single rate figure, if one value stated",
-    "range_min_pct?": "number — low end, if a range is stated",
-    "range_max_pct?": "number — high end, if a range is stated",
-    "is_floor_claim": "boolean — true for 'as low as'/'from'/'starting at' framing",
-    "labeled_as_apr": "boolean — true if the figure carries the APR label",
-    "rate_kind": "enum: apr | interest_rate | unlabeled — how the figure is presented (serves the not_conflated comparator)"
+    "value_pct": {
+     "type": "number",
+     "description": "the single rate figure, if one value stated",
+     "optional": true
+    },
+    "range_min_pct": {
+     "type": "number",
+     "description": "low end, if a range is stated",
+     "optional": true
+    },
+    "range_max_pct": {
+     "type": "number",
+     "description": "high end, if a range is stated",
+     "optional": true
+    },
+    "is_floor_claim": {
+     "type": "boolean",
+     "description": "true for 'as low as'/'from'/'starting at' framing",
+     "optional": false
+    },
+    "labeled_as_apr": {
+     "type": "boolean",
+     "description": "true if the figure carries the APR label",
+     "optional": false
+    },
+    "rate_kind": {
+     "type": "string",
+     "values": [
+      "apr",
+      "interest_rate",
+      "unlabeled"
+     ],
+     "description": "how the figure is presented (serves the not_conflated comparator)",
+     "optional": false
+    }
    }
   },
   "promotional_or_introductory": {
@@ -117,11 +170,31 @@
     ]
    },
    "normalized_fields": {
-    "promo_rate_pct": "number — the promotional rate figure (0 for 0%)",
-    "promo_period_months?": "integer — promo duration in months, if stated",
-    "has_intro_word": "boolean — 'intro'/'introductory' adjacent to this span",
-    "is_deferred_interest": "boolean — true for 'no interest if paid in full' structures",
-    "post_promo_rate_stated": "boolean — the go-to rate (or range) appears in the creative"
+    "promo_rate_pct": {
+     "type": "number",
+     "description": "the promotional rate figure (0 for 0%)",
+     "optional": false
+    },
+    "promo_period_months": {
+     "type": "number",
+     "description": "promo duration in months, if stated (integer)",
+     "optional": true
+    },
+    "has_intro_word": {
+     "type": "boolean",
+     "description": "'intro'/'introductory' adjacent to this span",
+     "optional": false
+    },
+    "is_deferred_interest": {
+     "type": "boolean",
+     "description": "true for 'no interest if paid in full' structures",
+     "optional": false
+    },
+    "post_promo_rate_stated": {
+     "type": "boolean",
+     "description": "the go-to rate (or range) appears in the creative",
+     "optional": false
+    }
    }
   },
   "fixed_rate_representation": {
@@ -162,8 +235,16 @@
     ]
    },
    "normalized_fields": {
-    "applies_to_rate": "boolean — true when 'fixed'/immutability modifies the product's rate or payment",
-    "fixed_period_stated?": "string — the stated period during which the rate is fixed, if any (null = unbounded claim)"
+    "applies_to_rate": {
+     "type": "boolean",
+     "description": "true when 'fixed'/immutability modifies the product's rate or payment",
+     "optional": false
+    },
+    "fixed_period_stated": {
+     "type": "string",
+     "description": "the stated period during which the rate is fixed, if any (null = unbounded claim)",
+     "optional": true
+    }
    }
   },
   "approval_or_prequalification": {
@@ -204,9 +285,29 @@
     ]
    },
    "normalized_fields": {
-    "badge_word": "string — the operative term as rendered ('pre-approved', 'prequalified', 'guaranteed', ...)",
-    "strength": "enum: guaranteed | pre_approved | prequalified | odds_numeric | odds_qualitative | invitation — descending assertiveness of the outcome claim",
-    "odds_value_pct?": "number — the numeric odds figure, when strength=odds_numeric"
+    "badge_word": {
+     "type": "string",
+     "description": "the operative term as rendered ('pre-approved', 'prequalified', 'guaranteed', ...)",
+     "optional": false
+    },
+    "strength": {
+     "type": "string",
+     "values": [
+      "guaranteed",
+      "pre_approved",
+      "prequalified",
+      "odds_numeric",
+      "odds_qualitative",
+      "invitation"
+     ],
+     "description": "descending assertiveness of the outcome claim",
+     "optional": false
+    },
+    "odds_value_pct": {
+     "type": "number",
+     "description": "the numeric odds figure, when strength=odds_numeric",
+     "optional": true
+    }
    }
   },
   "fee_or_cost": {
@@ -247,10 +348,38 @@
     ]
    },
    "normalized_fields": {
-    "fee_claim_kind": "enum: absence_of_fee | specific_fee_amount | fee_disclosure — asserting no fees, stating a fee figure, or disclosing fee mechanics",
-    "fee_type?": "enum: annual_fee | origination_fee | closing_costs | balance_transfer_fee | other — which fee, if identifiable",
-    "amount_value?": "number — the fee amount or percentage, if stated",
-    "amount_is_pct?": "boolean — true when the stated fee is a percentage rather than a dollar amount"
+    "fee_claim_kind": {
+     "type": "string",
+     "values": [
+      "absence_of_fee",
+      "specific_fee_amount",
+      "fee_disclosure"
+     ],
+     "description": "asserting no fees, stating a fee figure, or disclosing fee mechanics",
+     "optional": false
+    },
+    "fee_type": {
+     "type": "string",
+     "values": [
+      "annual_fee",
+      "origination_fee",
+      "closing_costs",
+      "balance_transfer_fee",
+      "other"
+     ],
+     "description": "which fee, if identifiable",
+     "optional": true
+    },
+    "amount_value": {
+     "type": "number",
+     "description": "the fee amount or percentage, if stated",
+     "optional": true
+    },
+    "amount_is_pct": {
+     "type": "boolean",
+     "description": "true when the stated fee is a percentage rather than a dollar amount",
+     "optional": true
+    }
    }
   },
   "endorsement_or_testimonial": {
@@ -284,10 +413,26 @@
     ]
    },
    "normalized_fields": {
-    "endorser_named": "boolean — an identifiable person/handle is attached",
-    "material_connection_disclosed": "boolean — compensation/relationship disclosure present in the same span or immediately adjacent",
-    "atypical_result_claimed": "boolean — a specific outcome (savings, rewards, score change) is asserted",
-    "result_claim_text?": "string — the asserted outcome, verbatim, if any"
+    "endorser_named": {
+     "type": "boolean",
+     "description": "an identifiable person/handle is attached",
+     "optional": false
+    },
+    "material_connection_disclosed": {
+     "type": "boolean",
+     "description": "compensation/relationship disclosure present in the same span or immediately adjacent",
+     "optional": false
+    },
+    "atypical_result_claimed": {
+     "type": "boolean",
+     "description": "a specific outcome (savings, rewards, score change) is asserted",
+     "optional": false
+    },
+    "result_claim_text": {
+     "type": "string",
+     "description": "the asserted outcome, verbatim, if any",
+     "optional": true
+    }
    }
   },
   "government_affiliation": {
@@ -321,9 +466,21 @@
     ]
    },
    "normalized_fields": {
-    "agency_or_program?": "string — the named agency/program (FHA, VA, HUD, ...), if any",
-    "is_program_reference": "boolean — true when referencing a real loan program (FHA/VA product)",
-    "affiliation_implied": "boolean — true when the framing implies the sender IS or REPRESENTS a government entity ('official notice')"
+    "agency_or_program": {
+     "type": "string",
+     "description": "the named agency/program (FHA, VA, HUD, ...), if any",
+     "optional": true
+    },
+    "is_program_reference": {
+     "type": "boolean",
+     "description": "true when referencing a real loan program (FHA/VA product)",
+     "optional": false
+    },
+    "affiliation_implied": {
+     "type": "boolean",
+     "description": "true when the framing implies the sender IS or REPRESENTS a government entity ('official notice')",
+     "optional": false
+    }
    }
   },
   "general_udaap_representation": {
@@ -365,10 +522,36 @@
     ]
    },
    "normalized_fields": {
-    "representation_kind": "enum: urgency_device | comparative_superlative | amount_offered | savings_claim | soft_pull_claim | debt_elimination | geographic_availability | other",
-    "amount_value?": "number — the offered amount, when representation_kind=amount_offered (serves PL-TRUTH-001 amount reconciliation)",
-    "claimed_deadline?": "string — the stated/implied expiry, when representation_kind=urgency_device (serves XP-URG-004)",
-    "comparative_is_measurable?": "boolean — superlative asserts a verifiable market fact, when representation_kind=comparative_superlative"
+    "representation_kind": {
+     "type": "string",
+     "values": [
+      "urgency_device",
+      "comparative_superlative",
+      "amount_offered",
+      "savings_claim",
+      "soft_pull_claim",
+      "debt_elimination",
+      "geographic_availability",
+      "other"
+     ],
+     "description": "one of the allowed values",
+     "optional": false
+    },
+    "amount_value": {
+     "type": "number",
+     "description": "the offered amount, when representation_kind=amount_offered (serves PL-TRUTH-001 amount reconciliation)",
+     "optional": true
+    },
+    "claimed_deadline": {
+     "type": "string",
+     "description": "the stated/implied expiry, when representation_kind=urgency_device (serves XP-URG-004)",
+     "optional": true
+    },
+    "comparative_is_measurable": {
+     "type": "boolean",
+     "description": "superlative asserts a verifiable market fact, when representation_kind=comparative_superlative",
+     "optional": true
+    }
    }
   }
  }

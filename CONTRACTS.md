@@ -13,7 +13,9 @@ One marketing claim extracted from an evidence artifact (mock, screenshot, HTML)
 
 **Amendment #4** (2026-08-29, user-directed, explicit): `Claim.claim_type` (singular) → `Claim.claim_types: ClaimType[]` (min length 1). One statement = one claim object; a span embodying multiple legal categories lists them all.
 
-**Amendment #5** (2026-08-29, user-directed, explicit): `Claim` gains `normalized_fields: dict` — the union of the listed claim types' payload contracts — and the payload contracts themselves become importable typed models: one pydantic model per ClaimType (field names exactly from `rulebook/claim_types_legal_map.json` `normalized_fields`; `'?'`-suffixed spec fields are Optional), registered in `CLAIM_TYPE_PAYLOADS`, validated with `validate_claim_payload()` (unknown keys rejected; each listed type's required fields present and type-valid). A sync test enforces model↔spec drift discipline.
+**Amendment #5** (2026-08-29, user-directed, explicit): `Claim` gains `normalized_fields: dict` — the union of the listed claim types' payload contracts — and the payload contracts become importable typed models registered in `CLAIM_TYPE_PAYLOADS`, validated with `validate_claim_payload()` (unknown keys rejected; each listed type's required fields present and type-valid).
+
+**Amendment #5a — derivation (2026-08-29):** the payload models are **generated from `rulebook/claim_types_legal_map.json` at import time** (`_build_payload_models` in `backend/contracts.py`): each structured `normalized_fields` entry (`{type, values?, optional, description}`) becomes a pydantic field (`number`→float, `boolean`→bool, `string`→str, `values`→`Literal[...]`, `optional`→`Optional[...] = None`). **Edit the map, never the models** — there are no hand-written payload models to drift, and a construction test guards the generation.
 
 | Value | Legal anchor |
 |---|---|

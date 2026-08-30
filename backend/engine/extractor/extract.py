@@ -224,9 +224,11 @@ def build_system_prompt(spec: dict) -> str:
                 lines.append(f"- NEGATIVE: {neg!r}")
         nf = t.get("normalized_fields", {})
         if nf:
-            lines.append("Normalized fields to populate when applicable ('?' suffix = optional):")
+            lines.append("Normalized fields (REQUIRED unless marked optional):")
             for k, v in nf.items():
-                lines.append(f"  - {k}: {v}")
+                opt = " (optional)" if v.get("optional") else ""
+                vals = f" — one of {' | '.join(v['values'])}" if v.get("values") else ""
+                lines.append(f"  - {k}{opt} [{v['type']}]: {v['description']}{vals}")
         lines.append("")
     lines += [
         "## Conventions",
@@ -239,7 +241,7 @@ def build_system_prompt(spec: dict) -> str:
         "  qualifies) ARE claims — always extract them.",
         "- normalized_fields: key/value pairs covering the union of the listed claim types'",
         "  payload contracts. Values stringified ('true'/'false' for booleans, plain digits",
-        "  for numbers). Fields WITHOUT the '?' suffix are REQUIRED whenever their claim",
+        "  for numbers). Fields NOT marked (optional) are REQUIRED whenever their claim",
         "  type is listed and must NEVER be omitted — emit them even when the answer is",
         "  'false' or '0'. When a field has NO value, OMIT the pair entirely — never emit",
         "  an empty string.",

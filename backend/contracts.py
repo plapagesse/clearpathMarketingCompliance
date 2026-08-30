@@ -9,11 +9,13 @@ change out explicitly. See CONTRACTS.md.
 
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
 from enum import Enum
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
 
 # --------------------------------------------------------------------------- #
@@ -126,98 +128,57 @@ class Claim(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Claim-type payload models (amendment #5)
+# Claim-type payload models (amendment #5, derived)
 #
-# One pydantic model per ClaimType; field names come EXACTLY from
-# rulebook/claim_types_legal_map.json normalized_fields ('?'-suffixed spec
-# fields are Optional with None default; the rest are required). A sync test
-# in the extractor suite enforces model<->spec drift discipline.
+# SINGLE SOURCE OF TRUTH: rulebook/claim_types_legal_map.json. The payload
+# models are GENERATED here at import time from that file's structured
+# normalized_fields entries (type number->float, boolean->bool, string->str;
+# "values" -> Literal[...]; optional -> Optional[...] = None). Edit the map,
+# never the models.
 # --------------------------------------------------------------------------- #
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_LEGAL_MAP_PATH = _REPO_ROOT / "rulebook" / "claim_types_legal_map.json"
 
-class TriggeringTermPayload(BaseModel):
-    payment_amount: float | None = None
-    num_payments: int | None = None
-    term_months: int | None = None
-    downpayment: float | None = None
-    finance_charge: float | None = None
-    downpayment_is_pct: bool | None = None
+_PAYLOAD_PY_TYPES: dict[str, type] = {"number": float, "boolean": bool, "string": str}
 
 
-class RateOrAprPayload(BaseModel):
-    value_pct: float | None = None
-    range_min_pct: float | None = None
-    range_max_pct: float | None = None
-    is_floor_claim: bool
-    labeled_as_apr: bool
-    rate_kind: Literal["apr", "interest_rate", "unlabeled"]
+def _build_payload_models(map_path: Path = _LEGAL_MAP_PATH) -> dict[ClaimType, type[BaseModel]]:
+    if not map_path.exists():
+        raise FileNotFoundError(
+            f"claim-type payload source of truth not found: {map_path} "
+            "(rulebook/claim_types_legal_map.json is required to import contracts)"
+        )
+    spec = json.loads(map_path.read_text())["claim_types"]
+    registry: dict[ClaimType, type[BaseModel]] = {}
+    for ct in ClaimType:
+        if ct.value not in spec:
+            raise ValueError(f"{map_path.name} has no entry for claim type {ct.value!r}")
+        fields: dict = {}
+        for name, fs in spec[ct.value]["normalized_fields"].items():
+            if not isinstance(fs, dict) or "type" not in fs or "optional" not in fs:
+                raise ValueError(
+                    f"malformed normalized_fields entry {ct.value}.{name}: "
+                    f"expected {{type, optional, description[, values]}}, got {fs!r}"
+                )
+            if fs.get("values"):
+                base = Literal[tuple(fs["values"])]
+            elif fs["type"] in _PAYLOAD_PY_TYPES:
+                base = _PAYLOAD_PY_TYPES[fs["type"]]
+            else:
+                raise ValueError(
+                    f"malformed normalized_fields entry {ct.value}.{name}: unknown type {fs['type']!r}"
+                )
+            if fs["optional"]:
+                fields[name] = (base | None, None)
+            else:
+                fields[name] = (base, ...)
+        model_name = "".join(w.capitalize() for w in ct.value.split("_")) + "Payload"
+        registry[ct] = create_model(model_name, **fields)
+    return registry
 
 
-class PromotionalOrIntroductoryPayload(BaseModel):
-    promo_rate_pct: float
-    promo_period_months: int | None = None
-    has_intro_word: bool
-    is_deferred_interest: bool
-    post_promo_rate_stated: bool
-
-
-class FixedRateRepresentationPayload(BaseModel):
-    applies_to_rate: bool
-    fixed_period_stated: str | None = None
-
-
-class ApprovalOrPrequalificationPayload(BaseModel):
-    badge_word: str
-    strength: Literal[
-        "guaranteed", "pre_approved", "prequalified",
-        "odds_numeric", "odds_qualitative", "invitation",
-    ]
-    odds_value_pct: float | None = None
-
-
-class FeeOrCostPayload(BaseModel):
-    fee_claim_kind: Literal["absence_of_fee", "specific_fee_amount", "fee_disclosure"]
-    fee_type: Literal[
-        "annual_fee", "origination_fee", "closing_costs", "balance_transfer_fee", "other"
-    ] | None = None
-    amount_value: float | None = None
-    amount_is_pct: bool | None = None
-
-
-class EndorsementOrTestimonialPayload(BaseModel):
-    endorser_named: bool
-    material_connection_disclosed: bool
-    atypical_result_claimed: bool
-    result_claim_text: str | None = None
-
-
-class GovernmentAffiliationPayload(BaseModel):
-    agency_or_program: str | None = None
-    is_program_reference: bool
-    affiliation_implied: bool
-
-
-class GeneralUdaapRepresentationPayload(BaseModel):
-    representation_kind: Literal[
-        "urgency_device", "comparative_superlative", "amount_offered", "savings_claim",
-        "soft_pull_claim", "debt_elimination", "geographic_availability", "other",
-    ]
-    amount_value: float | None = None
-    claimed_deadline: str | None = None
-    comparative_is_measurable: bool | None = None
-
-
-CLAIM_TYPE_PAYLOADS: dict[ClaimType, type[BaseModel]] = {
-    ClaimType.TRIGGERING_TERM: TriggeringTermPayload,
-    ClaimType.RATE_OR_APR: RateOrAprPayload,
-    ClaimType.PROMOTIONAL_OR_INTRODUCTORY: PromotionalOrIntroductoryPayload,
-    ClaimType.FIXED_RATE_REPRESENTATION: FixedRateRepresentationPayload,
-    ClaimType.APPROVAL_OR_PREQUALIFICATION: ApprovalOrPrequalificationPayload,
-    ClaimType.FEE_OR_COST: FeeOrCostPayload,
-    ClaimType.ENDORSEMENT_OR_TESTIMONIAL: EndorsementOrTestimonialPayload,
-    ClaimType.GOVERNMENT_AFFILIATION: GovernmentAffiliationPayload,
-    ClaimType.GENERAL_UDAAP_REPRESENTATION: GeneralUdaapRepresentationPayload,
-}
+CLAIM_TYPE_PAYLOADS: dict[ClaimType, type[BaseModel]] = _build_payload_models()
 
 
 def validate_claim_payload(claim: Claim) -> None:
