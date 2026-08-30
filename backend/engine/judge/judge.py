@@ -121,7 +121,12 @@ def build_judge_prompt(
 ) -> str:
     """The full judge instruction: role, the rules' standards, the structured
     reading of the ad, and the output contract. Used as the system prompt; the
-    screenshot travels alongside as a vision block."""
+    screenshot travels alongside as a vision block.
+
+    Self-scoping: accepts the full rulebook (object or list) and filters to the
+    submission's product's llm_judged rules itself — idempotent for pre-filtered
+    input."""
+    rules = _applicable_rules(rules, submission)
     lines = [
         "You are the gray-area compliance judge for consumer-credit advertising.",
         "A deterministic checker has already enforced every mechanical rule; your job is",
@@ -142,6 +147,7 @@ def build_judge_prompt(
         lines.append(f"### {r.rule_id}  (severity: {r.severity.value})")
         lines.append(f"Authority: {primary.body}, {primary.citation}")
         lines.append(f"Standard: {p.get('judge_focus', r.explanation)}")
+        lines.append(f"Rationale: {r.explanation}")
         for ex in p.get("violation_examples", []) or []:
             lines.append(f"  - WOULD violate: {ex}")
         cc = p.get("compliant_contrast")
