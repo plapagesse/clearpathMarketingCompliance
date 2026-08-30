@@ -169,75 +169,49 @@ export interface CheckRun {
 
 /** normalized_fields payload for claim type "triggering_term" */
 export interface TriggeringTermPayload {
-  payment_amount?: number | null;
-  num_payments?: number | null;
   term_months?: number | null;
-  downpayment?: number | null;
-  finance_charge?: number | null;
-  downpayment_is_pct?: boolean | null;
 }
 
 /** normalized_fields payload for claim type "rate_or_apr" */
 export interface RateOrAprPayload {
-  value_pct?: number | null;
+  value_pct: number;
   range_min_pct?: number | null;
   range_max_pct?: number | null;
-  is_floor_claim: boolean;
-  labeled_as_apr: boolean;
-  rate_kind: "apr" | "interest_rate" | "unlabeled";
+  is_floor_claim?: boolean | null;
+  labeled_as_apr?: boolean | null;
+  rate_kind?: "apr" | "interest_rate" | "unlabeled" | null;
 }
 
 /** normalized_fields payload for claim type "promotional_or_introductory" */
 export interface PromotionalOrIntroductoryPayload {
-  promo_rate_pct: number;
+  promo_rate_pct?: number | null;
   promo_period_months?: number | null;
-  has_intro_word: boolean;
-  is_deferred_interest: boolean;
-  post_promo_rate_stated: boolean;
 }
 
 /** normalized_fields payload for claim type "fixed_rate_representation" */
 export interface FixedRateRepresentationPayload {
-  applies_to_rate: boolean;
-  fixed_period_stated?: string | null;
 }
 
 /** normalized_fields payload for claim type "approval_or_prequalification" */
 export interface ApprovalOrPrequalificationPayload {
-  badge_word: string;
-  strength: "guaranteed" | "pre_approved" | "prequalified" | "odds_numeric" | "odds_qualitative" | "invitation";
-  odds_value_pct?: number | null;
 }
 
 /** normalized_fields payload for claim type "fee_or_cost" */
 export interface FeeOrCostPayload {
-  fee_claim_kind: "absence_of_fee" | "specific_fee_amount" | "fee_disclosure";
   fee_type?: "annual_fee" | "origination_fee" | "closing_costs" | "balance_transfer_fee" | "other" | null;
   amount_value?: number | null;
-  amount_is_pct?: boolean | null;
 }
 
 /** normalized_fields payload for claim type "endorsement_or_testimonial" */
 export interface EndorsementOrTestimonialPayload {
-  endorser_named: boolean;
-  material_connection_disclosed: boolean;
-  atypical_result_claimed: boolean;
-  result_claim_text?: string | null;
 }
 
 /** normalized_fields payload for claim type "government_affiliation" */
 export interface GovernmentAffiliationPayload {
-  agency_or_program?: string | null;
-  is_program_reference: boolean;
-  affiliation_implied: boolean;
 }
 
 /** normalized_fields payload for claim type "general_udaap_representation" */
 export interface GeneralUdaapRepresentationPayload {
-  representation_kind: "urgency_device" | "comparative_superlative" | "amount_offered" | "savings_claim" | "soft_pull_claim" | "debt_elimination" | "geographic_availability" | "other";
-  amount_value?: number | null;
-  claimed_deadline?: string | null;
-  comparative_is_measurable?: boolean | null;
 }
 
 /** ClaimType value -> its payload interface. */
