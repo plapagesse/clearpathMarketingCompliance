@@ -82,12 +82,19 @@ def _grade_values(expected: dict, got: dict) -> list[dict]:
             if have is not None:
                 mismatches.append({"field": field, "expected": None, "got": have, "reason": "value"})
             continue
+        if isinstance(want, bool):
+            # absent optional booleans are false-equivalent (trim semantics):
+            # expected false matches an absent field; expected true does not
+            have = got.get(field, False)
+            if not (isinstance(have, bool) and want is have):
+                mismatches.append({"field": field, "expected": want, "got": have, "reason": "value"})
+            continue
         if field not in got:
             mismatches.append({"field": field, "expected": want, "got": None, "reason": "missing"})
             continue
         have = got[field]
-        if isinstance(want, bool) or isinstance(have, bool):
-            ok = want is have if isinstance(want, bool) and isinstance(have, bool) else False
+        if isinstance(have, bool):
+            ok = False  # non-bool expected vs bool got is never equal
         elif isinstance(want, (int, float)) and isinstance(have, (int, float)):
             ok = abs(float(want) - float(have)) < 1e-3
         elif isinstance(want, str) and isinstance(have, str):

@@ -153,9 +153,6 @@ def test_multilabel_claim_with_union_payload(monkeypatch, png):
                 normalized_fields=[
                     ex._NormalizedField(key="promo_rate_pct", value="0"),
                     ex._NormalizedField(key="promo_period_months", value="15"),
-                    ex._NormalizedField(key="has_intro_word", value="true"),
-                    ex._NormalizedField(key="is_deferred_interest", value="false"),
-                    ex._NormalizedField(key="post_promo_rate_stated", value="false"),
                     ex._NormalizedField(key="term_months", value="15"),
                 ],
             )
@@ -169,7 +166,6 @@ def test_multilabel_claim_with_union_payload(monkeypatch, png):
     assert isinstance(c, Claim)
     assert set(c.claim_types) == {ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM}
     assert c.normalized_fields["promo_rate_pct"] == 0
-    assert c.normalized_fields["has_intro_word"] is True
     assert c.normalized_fields["term_months"] == 15  # union payload survives
 
 
@@ -302,12 +298,15 @@ def test_payload_models_constructed_from_spec():
     for name, fs in spec["rate_or_apr"]["normalized_fields"].items():
         assert m.model_fields[name].is_required() == (not fs["optional"]), name
     import typing
-    assert set(typing.get_args(m.model_fields["rate_kind"].annotation)) ==         set(spec["rate_or_apr"]["normalized_fields"]["rate_kind"]["values"])
+    assert set(ex._literal_values(m.model_fields["rate_kind"].annotation)) == \
+        set(spec["rate_or_apr"]["normalized_fields"]["rate_kind"]["values"])
     # spot-check 2: triggering_term — all optional, numbers are floats
     tt = CLAIM_TYPE_PAYLOADS[ClaimType.TRIGGERING_TERM]
     assert all(not fi.is_required() for fi in tt.model_fields.values())
-    # spot-check 3: promotional — promo_rate_pct required
-    assert CLAIM_TYPE_PAYLOADS[ClaimType.PROMOTIONAL_OR_INTRODUCTORY].model_fields["promo_rate_pct"].is_required()
+    # spot-check 3: promotional — promo_rate_pct optional post-trim (deferred-interest promos)
+    assert not CLAIM_TYPE_PAYLOADS[ClaimType.PROMOTIONAL_OR_INTRODUCTORY].model_fields["promo_rate_pct"].is_required()
+    # spot-check 4: trimmed types have empty payload models
+    assert CLAIM_TYPE_PAYLOADS[ClaimType.APPROVAL_OR_PREQUALIFICATION].model_fields == {}
     # malformed spec -> clear error
     bad = {"claim_types": {ct.value: {"normalized_fields": {}} for ct in ClaimType}}
     bad["claim_types"]["rate_or_apr"]["normalized_fields"] = {"x": {"type": "wat", "optional": True, "description": "d"}}
@@ -328,26 +327,32 @@ def _claim(types, nf):
 def test_payload_validation_accepts_valid_union():
     validate_claim_payload(_claim(
         [ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM],
-        {"promo_rate_pct": 0.0, "has_intro_word": True, "is_deferred_interest": False,
-         "post_promo_rate_stated": False, "term_months": 15},
+        {"promo_rate_pct": 0.0, "term_months": 15},
     ))
+    # empty-payload types validate with no normalized_fields at all
+    validate_claim_payload(_claim([ClaimType.APPROVAL_OR_PREQUALIFICATION], {}))
+    validate_claim_payload(_claim([ClaimType.ENDORSEMENT_OR_TESTIMONIAL], {}))
 
 
 def test_payload_validation_rejects_unknown_key():
     with pytest.raises(ValueError, match="belong to none"):
         validate_claim_payload(_claim([ClaimType.RATE_OR_APR],
-            {"is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "apr", "bogus_key": 1}))
+            {"value_pct": 8.99, "rate_kind": "apr", "bogus_key": 1}))
+    # a TRIMMED (deleted) field is now an unknown key — the trim is enforced
+    with pytest.raises(ValueError, match="belong to none"):
+        validate_claim_payload(_claim([ClaimType.APPROVAL_OR_PREQUALIFICATION],
+            {"badge_word": "pre-approved"}))
 
 
 def test_payload_validation_rejects_missing_required():
     with pytest.raises(ValidationError):
-        validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"value_pct": 8.99}))
+        validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"is_floor_claim": True}))
 
 
 def test_payload_validation_rejects_wrong_type():
     with pytest.raises(ValidationError):
         validate_claim_payload(_claim([ClaimType.RATE_OR_APR],
-            {"is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "banana"}))
+            {"value_pct": 8.99, "rate_kind": "banana"}))
 
 
 def test_invalid_payload_joins_retry_path(monkeypatch, png):
@@ -455,14 +460,13 @@ def test_empty_value_pairs_are_dropped(monkeypatch, png):
     raw = ex._ModelExtraction(
         claims=[
             ex._ModelClaim(
-                claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
-                text="You're prequalified",
-                location="badge",
+                claim_types=[ClaimType.RATE_OR_APR],
+                text="APR as low as 8.99%",
+                location="body",
                 normalized_fields=[
-                    ex._NormalizedField(key="badge_word", value="prequalified"),
-                    ex._NormalizedField(key="strength", value="prequalified"),
-                    ex._NormalizedField(key="odds_value_pct", value=""),
-                    ex._NormalizedField(key="fixed_period_stated", value="   "),
+                    ex._NormalizedField(key="value_pct", value="8.99"),
+                    ex._NormalizedField(key="range_min_pct", value=""),
+                    ex._NormalizedField(key="rate_kind", value="   "),
                 ],
             )
         ],
@@ -472,8 +476,8 @@ def test_empty_value_pairs_are_dropped(monkeypatch, png):
     ctx = ex.ExtractionContext(product=Product.PERSONAL_LOAN, evidence_id="t7")
     result = ex.extract(png, ctx, client=object())
     nf = result.claims[0].normalized_fields
-    assert "odds_value_pct" not in nf and "fixed_period_stated" not in nf
-    assert nf == {"badge_word": "prequalified", "strength": "prequalified"}
+    assert "range_min_pct" not in nf and "rate_kind" not in nf
+    assert nf == {"value_pct": 8.99}
 
 
 def test_spec_prose_never_references_undeclared_fields():
@@ -508,3 +512,12 @@ def test_spec_prose_never_references_undeclared_fields():
                 if tok not in allowed:
                     offenders.append(f"{ct.value}.{where}: {tok!r}")
     assert not offenders, "prose references undeclared fields:\n" + "\n".join(offenders)
+
+
+def test_grade_values_absent_bool_is_false_equivalent():
+    """Trim semantics: absent optional booleans are false-equivalent — expected
+    false matches an absent field; expected true does not."""
+    assert ev._grade_values({"is_floor_claim": False}, {"value_pct": 8.99}) == []
+    mm = ev._grade_values({"is_floor_claim": True}, {"value_pct": 8.99})
+    assert len(mm) == 1 and mm[0]["reason"] == "value" and mm[0]["got"] is False
+    assert ev._grade_values({"is_floor_claim": True}, {"is_floor_claim": True}) == []
