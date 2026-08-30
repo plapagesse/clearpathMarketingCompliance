@@ -15,9 +15,11 @@ FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
 
+    from backend.api.review import review_bp
     from backend.prequal.api import prequal_bp
 
     app.register_blueprint(prequal_bp)
+    app.register_blueprint(review_bp)
 
     @app.get("/api/health")
     def health():

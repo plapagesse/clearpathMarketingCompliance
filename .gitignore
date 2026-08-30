@@ -11,3 +11,6 @@ frontend/dist/
 .env
 .DS_Store
 *.sqlite3
+
+# Uploaded evidence (runtime artifacts)
+uploads/
