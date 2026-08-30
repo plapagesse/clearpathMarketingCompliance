@@ -114,13 +114,16 @@
         "checks": [
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "rate_value",
+            "claim_field": "value_pct",
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
-            "claim_field": "rate_floor",
+            "claim_field": "value_pct",
+            "claim_filter": {
+              "is_floor_claim": true
+            },
             "matrix_field": "apr_min",
             "comparator": "equals"
           },

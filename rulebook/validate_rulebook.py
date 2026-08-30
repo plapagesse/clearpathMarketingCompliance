@@ -139,7 +139,10 @@ PRIMITIVES: dict[str, dict] = {
             "companion_patterns": _is_str_list,
             "requirement": lambda v: isinstance(v, str),
         },
-        "optional": {},
+        # companions_require (v2026.08.4): "any" (default) = one proximate
+        # companion satisfies the anchor; "all" = every companion pattern that
+        # matches anywhere in the text must also match within the window.
+        "optional": {"companions_require": lambda v: v in ("any", "all")},
         "pattern_key": None,
     },
     "ground_truth_consistency": {
@@ -148,7 +151,9 @@ PRIMITIVES: dict[str, dict] = {
             "matrix_field": lambda v: isinstance(v, str),
             "comparator": lambda v: v in COMPARATORS,
         },
-        "optional": {},
+        # claim_filter (v2026.08.4): payload-equality narrowing, e.g.
+        # {"is_floor_claim": true} selects floor claims for the apr_min check.
+        "optional": {"claim_filter": lambda v: isinstance(v, dict) and v},
         "pattern_key": None,
     },
     "numeric_cap_by_state": {
@@ -307,8 +312,9 @@ def main() -> int:
                 )):
                     errors.append(f"{owner}: examples.negative needs >=1 {{span, reason}} objects")
             nf = spec.get("normalized_fields")
-            if not (isinstance(nf, dict) and nf):
-                errors.append(f"{owner}: missing/empty normalized_fields")
+            # Empty {} is legal since the payload trim: classify-and-route types carry no fields.
+            if not isinstance(nf, dict):
+                errors.append(f"{owner}: missing normalized_fields (empty {{}} is allowed)")
     else:
         errors.append("missing claim_types_legal_map.json")
 
