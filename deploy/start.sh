@@ -2,7 +2,7 @@
 # Production entrypoint: seed a fresh demo DB on every boot, then exec gunicorn.
 #
 # Re-seeding per restart is DELIBERATE — every deploy/restart starts from clean
-# demo state (10 fixture submissions + current offer matrix). Uploaded evidence
+# demo state (16 fixture submissions + current offer matrix). Uploaded evidence
 # and review decisions do not survive a restart; that is the demo contract.
 #
 # Env:
