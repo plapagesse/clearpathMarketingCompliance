@@ -278,6 +278,25 @@ def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> Extr
     )
 
 
+def _make_client():
+    """Anthropic client, workspace-header aware.
+
+    Identity-linked API keys are rejected with 400 ("anthropic-workspace-id is
+    required when authenticating with an identity-linked API key") unless the
+    anthropic-workspace-id header is sent; the SDK neither sends it
+    automatically nor reads an env var for it. Plain keys need no header.
+    Loads the repo .env first so standalone extract() calls work without the
+    caller pre-loading the environment."""
+    import anthropic
+    from dotenv import load_dotenv
+
+    load_dotenv(REPO_ROOT / ".env")
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    if workspace_id:
+        return anthropic.Anthropic(default_headers={"anthropic-workspace-id": workspace_id})
+    return anthropic.Anthropic()
+
+
 def extract(evidence: str | Path, context: ExtractionContext, client=None) -> ExtractionResult:
     """Extract typed claims and disclosures from one evidence artifact.
 
@@ -286,7 +305,7 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
     import anthropic
 
     if client is None:
-        client = anthropic.Anthropic()
+        client = _make_client()
     model = os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
     spec = load_classification_spec()
     system = build_system_prompt(spec)

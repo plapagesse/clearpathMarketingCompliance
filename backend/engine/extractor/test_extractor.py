@@ -250,3 +250,24 @@ def test_eval_dry_run_to_api_boundary(tmp_path, monkeypatch):
     # with a canned single-claim response, misses must carry diagnostics
     miss_rows = [r for m in report["per_mock"] for r in m["detail"] if not r["matched"]]
     assert all("extracted_texts" in r for r in miss_rows)
+
+
+def test_workspace_header_on_identity_linked_key(monkeypatch):
+    """Identity-linked keys need the anthropic-workspace-id header; plain keys don't."""
+    import anthropic
+
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(anthropic, "Anthropic", FakeClient)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-dummy")
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_test_123")
+    ex._make_client()
+    assert captured["default_headers"] == {"anthropic-workspace-id": "wrkspc_test_123"}
+    captured.clear()
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID")
+    ex._make_client()
+    assert "default_headers" not in captured
