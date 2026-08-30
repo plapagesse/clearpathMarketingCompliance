@@ -19,11 +19,11 @@ Invariants enforced:
   8. Every mock HTML has a sibling rendered PNG (same basename) of non-trivial
      size (>5KB) — PNGs are the canonical evidence artifacts the platform
      ingests; regenerate with render_screenshots.py.
-  9. Claim-anchored findings carry expected_normalized_fields whose keys are
-     declared normalized_fields names for the finding's expected_claim_type in
+  9. expected_normalized_fields is OPTIONAL on claim-anchored findings
+     (post payload-trim). When present, keys must be declared normalized_fields
+     names for the finding's expected_claim_type in
      rulebook/claim_types_legal_map.json ('?' optional suffix stripped) and
-     whose values are JSON scalars (null allowed where the map defines null
-     semantics). Absence-type findings must NOT carry the field.
+     values must be JSON scalars. Absence-type findings must NOT carry it.
 
 Exit code 0 = all pass; 1 = any mismatch.
 """
@@ -113,9 +113,9 @@ def main() -> int:
             nf = exp.get("expected_normalized_fields")
             anchored = exp.get("claim_text") is not None and exp.get("expected_claim_type") is not None
             if anchored:
-                if not isinstance(nf, dict) or not nf:
-                    errors.append(f"{label}: claim-anchored finding missing expected_normalized_fields")
-                else:
+                if nf is not None and (not isinstance(nf, dict) or not nf):
+                    errors.append(f"{label}: expected_normalized_fields present but not a non-empty object")
+                elif nf:
                     declared = {k.rstrip("?") for k in LEGAL_MAP[exp["expected_claim_type"]].get("normalized_fields", {})}
                     for k, v in nf.items():
                         if k not in declared:
