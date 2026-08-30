@@ -115,3 +115,72 @@ def test_persistent_failure_propagates(monkeypatch):
     ctx = ex.ExtractionContext(product=Product.CREDIT_CARD, evidence_id="t3")
     with pytest.raises(ValidationError):
         ex.extract("<div>x</div>", ctx, client=object())
+
+
+# --------------------------------------------------------------------------- #
+# Image-first additions
+# --------------------------------------------------------------------------- #
+
+# 1x1 red pixel PNG
+_PNG_BYTES = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108020000009077"
+    "53de0000000c4944415408d763f8cfc000000301010018dd8db00000000049454e44ae426082"
+)
+
+
+def test_image_block_assembly(tmp_path):
+    png = tmp_path / "shot.png"
+    png.write_bytes(_PNG_BYTES)
+    block = ex.build_image_block(png)
+    assert block["type"] == "image"
+    assert block["source"]["media_type"] == "image/png"
+    import base64 as b64
+    assert b64.standard_b64decode(block["source"]["data"]) == _PNG_BYTES
+    jpg = tmp_path / "shot.jpg"
+    jpg.write_bytes(b"\xff\xd8\xff\xe0fake")
+    assert ex.build_image_block(jpg)["source"]["media_type"] == "image/jpeg"
+    # _prepare_artifact routes a png path to a single vision block
+    blocks, kind = ex._prepare_artifact(png)
+    assert kind == "image" and blocks[0]["type"] == "image"
+
+
+def test_evidence_resolution_png_first_then_fallback(tmp_path, monkeypatch):
+    import backend.engine.extractor.eval as ev
+    monkeypatch.setattr(ev, "FIXTURES", tmp_path)
+    monkeypatch.setattr(ev, "RENDER_CACHE", tmp_path / "cache")
+    (tmp_path / "mock_a.html").write_text("<div>x</div>")
+    (tmp_path / "mock_a.png").write_bytes(_PNG_BYTES)
+    p, fmt = ev._resolve_evidence("mock_a.html", "png")
+    assert fmt == "png" and p.suffix == ".png"          # png wins when present
+    (tmp_path / "mock_b.html").write_text("<div>y</div>")
+    p, fmt = ev._resolve_evidence("mock_b.html", "png")
+    assert fmt == "html" and p.suffix == ".html"        # loud fallback path
+    p, fmt = ev._resolve_evidence("mock_a.html", "html")
+    assert fmt == "html"                                 # explicit html mode
+
+
+def test_normalizer_transcription_tolerance():
+    import backend.engine.extractor.eval as ev
+    assert ev._norm("Guaranteed approval — regardless") == ev._norm("guaranteed approval - regardless")
+    assert ev._norm("“No hidden fees”") == ev._norm('"no hidden fees"')
+    assert ev._norm("don’t pay") == ev._norm("don't pay")
+    assert ev._norm("0% intro  APR") == ev._norm("0% intro apr")
+    assert ev._norm("Wait…") == ev._norm("wait...")
+
+
+def test_eval_png_dry_run_to_api_boundary(tmp_path, monkeypatch):
+    """Full eval path in png mode with the model call mocked: resolution ->
+    extract -> scoring -> report. No key, no network, no PNGs on disk (falls
+    back loudly per mock) — proves the harness runs end-to-end."""
+    import backend.engine.extractor.eval as ev
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-dummy")
+    monkeypatch.setattr(ex, "_call_model", lambda client, system, blocks, model: _fake_raw())
+    monkeypatch.setattr(ev, "REPORT_PATH", tmp_path / "report.json")
+    monkeypatch.setattr(ev, "RENDER_CACHE", tmp_path / "cache")
+    report = ev.run_eval(evidence_format="png")
+    assert report["evidence_format_requested"] == "png"
+    assert len(report["per_mock"]) == 10
+    assert (tmp_path / "report.json").exists()
+    # with a canned single-claim response, misses must carry diagnostics
+    miss_rows = [r for m in report["per_mock"] for r in m["detail"] if not r["matched"]]
+    assert all("extracted_texts" in r for r in miss_rows)

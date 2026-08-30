@@ -1,19 +1,31 @@
 """Extractor eval harness: runs extract() over every fixture mock and scores
 against the ground-truth answer key (fixtures/expected_findings.json).
 
-Run: python -m backend.engine.extractor.eval
+Run: python -m backend.engine.extractor.eval [--evidence-format png|html]
+Default evidence format is PNG — images are the platform's canonical evidence
+type. PNG resolution order per mock: (1) fixtures/<base>.png on this checkout,
+(2) fixtures/<base>.png on origin/agent4/screenshot-renders (fetched and
+materialized into a local cache), (3) LOUD WARNING + fall back to the .html
+source so the eval still runs end-to-end.
+
 Writes backend/engine/extractor/eval_report.json and prints a table.
 
 Scoring (per fixtures/README.md semantics):
 - Universe: expected findings with non-null claim_text AND non-null
   expected_claim_type (claim-anchored findings; absence-type findings have no
   claim to extract and are excluded from extractor scoring).
-- Span match: normalized (entity-decoded, whitespace-collapsed, lowercased)
-  substring containment in either direction between expected claim_text and an
-  extracted claim's text.
+- Span match: transcription-tolerant normalized substring containment in
+  either direction between expected claim_text and an extracted claim's text.
+  With image evidence, literal text fidelity is bounded by vision
+  transcription, so the normalizer is deliberately wide: NFKC + casefold +
+  whitespace collapse + dash/quote unification (em/en dash -> hyphen, curly ->
+  straight quotes) + ellipsis/nbsp cleanup.
 - claim recall  = span-matched expected findings / universe
 - type accuracy = span matches whose best-matching claim carries the expected
   claim_type / span-matched expected findings
+- On MISSES the report and stdout include every extracted claim text for that
+  mock next to the expected text, so mismatch causes (transcription drift vs.
+  true extraction miss) are diagnosable at a glance.
 - Unmatched extracted claims are reported as informational volume, NOT errors:
   the answer key enumerates planted VIOLATIONS, while the extractor correctly
   emits every claim including compliant ones.
@@ -21,12 +33,15 @@ Scoring (per fixtures/README.md semantics):
 
 from __future__ import annotations
 
+import argparse
 import csv
 import html as htmllib
 import json
 import os
 import re
+import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -37,10 +52,48 @@ from backend.engine.extractor.extract import ExtractionContext, extract
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = REPO_ROOT / "fixtures"
 REPORT_PATH = Path(__file__).parent / "eval_report.json"
+RENDER_CACHE = Path(__file__).parent / ".render_cache"
+RENDERS_BRANCH = "agent4/screenshot-renders"
+
+_PUNCT_MAP = str.maketrans({
+    "—": "-", "–": "-", "−": "-",              # em/en dash, minus -> hyphen
+    "‘": "'", "’": "'",                               # curly single quotes
+    "“": '"', "”": '"',                               # curly double quotes
+    " ": " ",                                              # nbsp
+    "…": "...",                                            # ellipsis
+})
 
 
 def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", htmllib.unescape(s)).strip().lower()
+    """Transcription-tolerant normalizer (see module docstring)."""
+    s = unicodedata.normalize("NFKC", htmllib.unescape(s)).translate(_PUNCT_MAP)
+    return re.sub(r"\s+", " ", s).strip().casefold()
+
+
+def _resolve_evidence(fname: str, fmt: str) -> tuple[Path, str]:
+    """Resolve the evidence file for a mock. Returns (path, actual_format)."""
+    base = fname.replace(".html", "")
+    if fmt == "png":
+        local = FIXTURES / f"{base}.png"
+        if local.exists():
+            return local, "png"
+        cached = RENDER_CACHE / f"{base}.png"
+        if not cached.exists():
+            RENDER_CACHE.mkdir(exist_ok=True)
+            if not getattr(_resolve_evidence, "_fetched", False):
+                subprocess.run(["git", "fetch", "origin", RENDERS_BRANCH],
+                               cwd=REPO_ROOT, capture_output=True)
+                _resolve_evidence._fetched = True
+            got = subprocess.run(
+                ["git", "show", f"origin/{RENDERS_BRANCH}:fixtures/{base}.png"],
+                cwd=REPO_ROOT, capture_output=True)
+            if got.returncode == 0 and got.stdout:
+                cached.write_bytes(got.stdout)
+        if cached.exists():
+            return cached, "png"
+        print(f"WARNING: no PNG render for {base} (locally or on origin/{RENDERS_BRANCH}) — "
+              f"FALLING BACK to HTML source. Rendered-screenshot eval pending.", file=sys.stderr)
+    return FIXTURES / fname, "html"
 
 
 def _load_manifest() -> dict[str, dict]:
@@ -58,7 +111,7 @@ def _load_manifest() -> dict[str, dict]:
     return out
 
 
-def run_eval() -> dict:
+def run_eval(evidence_format: str = "png") -> dict:
     load_dotenv(REPO_ROOT / ".env")
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ANTHROPIC_API_KEY not set (env or .env) — live eval cannot run.", file=sys.stderr)
@@ -70,6 +123,7 @@ def run_eval() -> dict:
 
     per_mock: list[dict] = []
     tot_universe = tot_span = tot_type = tot_unmatched = 0
+    formats_used: dict[str, int] = {}
 
     for fname, entry in sorted(entries.items()):
         meta = manifest.get(fname, {"product": entry.get("product", "personal_loan"), "surface": "", "partner": "", "mode": entry.get("mode", "")})
@@ -79,7 +133,9 @@ def run_eval() -> dict:
             partner=meta["partner"],
             evidence_id=fname.replace(".html", ""),
         )
-        result = extract(FIXTURES / fname, ctx)
+        evidence_path, actual_fmt = _resolve_evidence(fname, evidence_format)
+        formats_used[actual_fmt] = formats_used.get(actual_fmt, 0) + 1
+        result = extract(evidence_path, ctx)
         claims = result.claims
 
         expected = [
@@ -107,10 +163,15 @@ def run_eval() -> dict:
                              "got_type": best.claim_type.value, "type_ok": ok})
             else:
                 rows.append({"claim_text": f["claim_text"], "matched": False,
-                             "expected_type": f["expected_claim_type"]})
+                             "expected_type": f["expected_claim_type"],
+                             "extracted_texts": [c.text for c in claims]})
+                print(f"  MISS in {fname}: expected {f['claim_text']!r}", file=sys.stderr)
+                for c in claims:
+                    print(f"    extracted: {c.text!r}", file=sys.stderr)
         unmatched = len(claims) - len(matched_claim_ids)
         per_mock.append({
             "mock": fname, "mode": meta["mode"],
+            "evidence_format": actual_fmt,
             "expected_claim_anchored": len(expected),
             "span_matched": span_hits, "type_correct": type_hits,
             "claims_extracted": len(claims),
@@ -123,11 +184,13 @@ def run_eval() -> dict:
         tot_span += span_hits
         tot_type += type_hits
         tot_unmatched += unmatched
-        print(f"{fname}: {span_hits}/{len(expected)} spans, {type_hits} types ok, "
+        print(f"{fname} [{actual_fmt}]: {span_hits}/{len(expected)} spans, {type_hits} types ok, "
               f"{len(claims)} claims, {len(result.disclosures)} disclosures")
 
     report = {
-        "model": per_mock and extract.__module__ and os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+        "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+        "evidence_format_requested": evidence_format,
+        "evidence_formats_used": formats_used,
         "universe_claim_anchored_findings": tot_universe,
         "claim_recall": round(tot_span / tot_universe, 3) if tot_universe else None,
         "type_accuracy_on_matched": round(tot_type / tot_span, 3) if tot_span else None,
@@ -148,4 +211,8 @@ def run_eval() -> dict:
 
 
 if __name__ == "__main__":
-    run_eval()
+    ap = argparse.ArgumentParser(description="Extractor eval over fixture mocks")
+    ap.add_argument("--evidence-format", choices=["png", "html"], default="png",
+                    help="png (canonical; falls back per-mock with a warning) or html")
+    args = ap.parse_args()
+    run_eval(evidence_format=args.evidence_format)

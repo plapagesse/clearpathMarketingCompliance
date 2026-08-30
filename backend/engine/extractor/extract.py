@@ -1,15 +1,27 @@
-"""Multimodal claim/disclosure extractor.
+"""Multimodal claim/disclosure extractor. IMAGES ARE THE CANONICAL INPUT.
 
-Reads an evidence artifact (HTML file, raw HTML string, or PNG/JPEG image),
-sends it to Claude with the classification spec injected from
-rulebook/claim_types_legal_map.json, and returns typed, contract-validated
-Claim and Disclosure objects.
+Real-world evidence is screenshots: partner-submitted mocks and seed-account
+captures arrive as pixels, not markup. extract() therefore treats PNG/JPEG as
+the primary evidence type — the artifact goes to Claude as a vision block and
+prominence assessment (an 8px footer vs. a headline) is a genuine visual-
+perception judgment: relative text size, position in the layout, contrast.
+An HTML path is retained as a secondary internal utility (fixtures were
+authored as HTML; comment-stripping guards the answer key), but the image
+path is the product surface.
+
+The classification spec is injected from rulebook/claim_types_legal_map.json
+at runtime; output is typed, contract-validated Claim/Disclosure objects.
 
 Cost/latency (rough, per extraction call at the default model claude-sonnet-5,
-$2/$10 per MTok): system prompt with the injected spec ~4K tokens + a fixture-
-sized HTML artifact ~1-2K tokens in, ~1-2K structured tokens out — about
-$0.02-0.04 and 10-30s per artifact. Images cost more input tokens
-(~1.5K per 1000x1000px image).
+$2/$10 per MTok): system prompt with the injected spec ~4K tokens; an image
+costs ~(width*height)/750 input tokens — a typical 800x1200 offer-card
+screenshot ~1.3-1.6K tokens (HTML source of fixture size is similar, 1-2K);
+~1-2K structured tokens out. About $0.02-0.05 and 10-40s per artifact.
+
+Text fidelity note: with image evidence, the literal `text` of claims and
+disclosures is bounded by the vision model's transcription — dashes, quote
+glyphs, and spacing may differ from source text. Downstream matching must use
+a transcription-tolerant normalizer (see eval.py's _norm).
 
 Model note: temperature is deliberately NOT set — sampling parameters
 (temperature/top_p/top_k) are removed on Claude Sonnet 5 / Opus 5 / Fable 5
@@ -120,18 +132,23 @@ def strip_html_comments(html: str) -> str:
     return _COMMENT_RE.sub("", html)
 
 
-def _prepare_artifact(evidence: str | Path) -> tuple[list[dict], str]:
-    """Return (message content blocks, kind). Accepts an HTML/image path or a raw HTML string.
+def build_image_block(path: Path) -> dict:
+    """Vision content block for the CANONICAL evidence type: a screenshot."""
+    media = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    data = base64.standard_b64encode(path.read_bytes()).decode("utf-8")
+    return {"type": "image", "source": {"type": "base64", "media_type": media, "data": data}}
 
-    HTML is sent as cleaned SOURCE, not tag-stripped text: inline styles
-    (font-size, position) and element structure are exactly the prominence
-    signals the Disclosure.prominence assessment needs, and fixture-sized
-    artifacts make the token overhead negligible."""
+
+def _prepare_artifact(evidence: str | Path) -> tuple[list[dict], str]:
+    """Return (message content blocks, kind).
+
+    PRIMARY: a PNG/JPEG screenshot path -> one vision block; the model reads
+    the ad the way a consumer does, and prominence is assessed visually.
+    SECONDARY (internal utility): an HTML path or raw HTML string -> cleaned
+    SOURCE (comments stripped; inline styles retained as prominence hints)."""
     p = Path(evidence) if not (isinstance(evidence, str) and "<" in evidence[:200]) else None
     if p is not None and p.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-        media = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
-        data = base64.standard_b64encode(p.read_bytes()).decode("utf-8")
-        return [{"type": "image", "source": {"type": "base64", "media_type": media, "data": data}}], "image"
+        return [build_image_block(p)], "image"
     html = p.read_text() if p is not None else str(evidence)
     cleaned = strip_html_comments(html)
     return [{"type": "text", "text": f"<artifact>\n{cleaned}\n</artifact>"}], "html"
@@ -192,8 +209,14 @@ def build_system_prompt(spec: dict) -> str:
         "   soft_pull: 'won't affect your credit score'; not_guaranteed: approval-not-guaranteed qualifier;",
         "   opt_out_notice: FCRA prescreen notice; nmls_id: NMLS number; taxes_insurance: payment excludes T&I;",
         "   intro_adjacency: the word 'intro' adjacent to a promo rate; use 'other' only as a last resort.)",
-        "- Report EVERY disclosure present with its location and an honest prominence assessment",
-        "  (font-size styles and position in the source are your prominence signals).",
+        "- Report EVERY disclosure present with its location and an honest prominence assessment.",
+        "  For SCREENSHOT evidence (the normal case), judge prominence VISUALLY: relative text size",
+        "  versus the dominant text, position in the layout (top/bottom, above/below the fold line),",
+        "  and contrast against the background — tiny low-contrast footer text is 'fine_print' or",
+        "  'footer' no matter what it says. For HTML-source evidence, font-size styles and element",
+        "  position carry the same signals.",
+        "- Transcribe text spans as accurately as the rendering allows; do not normalize away",
+        "  punctuation you can see (dashes, quotes), but never invent characters you cannot read.",
     ]
     return "\n".join(lines)
 
