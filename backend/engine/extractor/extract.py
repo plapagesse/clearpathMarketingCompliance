@@ -1,13 +1,11 @@
-"""Multimodal claim/disclosure extractor. IMAGES ARE THE CANONICAL INPUT.
+"""Image-only claim/disclosure extractor.
 
-Real-world evidence is screenshots: partner-submitted mocks and seed-account
-captures arrive as pixels, not markup. extract() therefore treats PNG/JPEG as
-the primary evidence type — the artifact goes to Claude as a vision block and
-prominence assessment (an 8px footer vs. a headline) is a genuine visual-
-perception judgment: relative text size, position in the layout, contrast.
-An HTML path is retained as a secondary internal utility (fixtures were
-authored as HTML; comment-stripping guards the answer key), but the image
-path is the product surface.
+Evidence is screenshots — PNG/JPEG paths, nothing else. Partner-submitted
+mocks and seed-account captures arrive as pixels; the artifact goes to Claude
+as a vision block, and prominence assessment (an 8px footer vs. a headline) is
+a genuine visual-perception judgment: relative text size, position in the
+layout, contrast. Screenshots cannot contain HTML comments by construction;
+the HTML sources live in /fixtures only as render inputs.
 
 The classification spec is injected from rulebook/claim_types_legal_map.json
 at runtime; output is typed, contract-validated Claim/Disclosure objects.
@@ -15,13 +13,13 @@ at runtime; output is typed, contract-validated Claim/Disclosure objects.
 Cost/latency (rough, per extraction call at the default model claude-sonnet-5,
 $2/$10 per MTok): system prompt with the injected spec ~4K tokens; an image
 costs ~(width*height)/750 input tokens — a typical 800x1200 offer-card
-screenshot ~1.3-1.6K tokens (HTML source of fixture size is similar, 1-2K);
-~1-2K structured tokens out. About $0.02-0.05 and 10-40s per artifact.
+screenshot ~1.3-1.6K tokens; ~1-2K structured tokens out. About $0.02-0.05
+and 10-40s per artifact.
 
-Text fidelity note: with image evidence, the literal `text` of claims and
-disclosures is bounded by the vision model's transcription — dashes, quote
-glyphs, and spacing may differ from source text. Downstream matching must use
-a transcription-tolerant normalizer (see eval.py's _norm).
+Text fidelity note: the literal `text` of claims and disclosures is bounded by
+the vision model's transcription — dashes, quote glyphs, and spacing may
+differ from source text. Downstream matching must use a transcription-tolerant
+normalizer (see eval.py's _norm).
 
 Model note: temperature is deliberately NOT set — sampling parameters
 (temperature/top_p/top_k) are removed on Claude Sonnet 5 / Opus 5 / Fable 5
@@ -46,9 +44,6 @@ LEGAL_MAP_PATH = REPO_ROOT / "rulebook" / "claim_types_legal_map.json"
 
 DEFAULT_MODEL = "claude-sonnet-5"
 MAX_TOKENS = 16000
-
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-
 
 # --------------------------------------------------------------------------- #
 # Public result types
@@ -128,36 +123,26 @@ class _ModelExtraction(BaseModel):
 # --------------------------------------------------------------------------- #
 
 
-def strip_html_comments(html: str) -> str:
-    """Remove ALL HTML comments before the model ever sees the artifact.
-
-    Fixture mocks carry answer-key comments describing their planted
-    violations (see fixtures/README.md) — leaving them in would contaminate
-    any eval. Applies to every HTML artifact, not just fixtures: comments are
-    never rendered to consumers, so they are never part of the ad."""
-    return _COMMENT_RE.sub("", html)
+SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg"}
 
 
 def build_image_block(path: Path) -> dict:
-    """Vision content block for the CANONICAL evidence type: a screenshot."""
+    """Vision content block for the one evidence type there is: a screenshot."""
     media = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
     data = base64.standard_b64encode(path.read_bytes()).decode("utf-8")
     return {"type": "image", "source": {"type": "base64", "media_type": media, "data": data}}
 
 
-def _prepare_artifact(evidence: str | Path) -> tuple[list[dict], str]:
-    """Return (message content blocks, kind).
-
-    PRIMARY: a PNG/JPEG screenshot path -> one vision block; the model reads
-    the ad the way a consumer does, and prominence is assessed visually.
-    SECONDARY (internal utility): an HTML path or raw HTML string -> cleaned
-    SOURCE (comments stripped; inline styles retained as prominence hints)."""
-    p = Path(evidence) if not (isinstance(evidence, str) and "<" in evidence[:200]) else None
-    if p is not None and p.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-        return [build_image_block(p)], "image"
-    html = p.read_text() if p is not None else str(evidence)
-    cleaned = strip_html_comments(html)
-    return [{"type": "text", "text": f"<artifact>\n{cleaned}\n</artifact>"}], "html"
+def _prepare_artifact(evidence: str | Path) -> list[dict]:
+    """A PNG/JPEG screenshot path -> one vision block. Anything else is an error:
+    the platform is image-only."""
+    p = Path(evidence)
+    if p.suffix.lower() not in SUPPORTED_SUFFIXES:
+        raise ValueError(
+            f"unsupported evidence {evidence!r}: the extractor accepts only image paths "
+            f"({', '.join(sorted(SUPPORTED_SUFFIXES))})"
+        )
+    return [build_image_block(p)]
 
 
 # --------------------------------------------------------------------------- #
@@ -219,11 +204,9 @@ def build_system_prompt(spec: dict) -> str:
         "   opt_out_notice: FCRA prescreen notice; nmls_id: NMLS number; taxes_insurance: payment excludes T&I;",
         "   intro_adjacency: the word 'intro' adjacent to a promo rate; use 'other' only as a last resort.)",
         "- Report EVERY disclosure present with its location and an honest prominence assessment.",
-        "  For SCREENSHOT evidence (the normal case), judge prominence VISUALLY: relative text size",
-        "  versus the dominant text, position in the layout (top/bottom, above/below the fold line),",
-        "  and contrast against the background — tiny low-contrast footer text is 'fine_print' or",
-        "  'footer' no matter what it says. For HTML-source evidence, font-size styles and element",
-        "  position carry the same signals.",
+        "  Judge prominence VISUALLY: relative text size versus the dominant text, position in the",
+        "  layout (top/bottom, above/below the fold line), and contrast against the background —",
+        "  tiny low-contrast footer text is 'fine_print' or 'footer' no matter what it says.",
         "- Transcribe text spans as accurately as the rendering allows; do not normalize away",
         "  punctuation you can see (dashes, quotes), but never invent characters you cannot read.",
     ]
@@ -307,14 +290,13 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
     model = os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
     spec = load_classification_spec()
     system = build_system_prompt(spec)
-    blocks, kind = _prepare_artifact(evidence)
-    blocks = blocks + [
+    blocks = _prepare_artifact(evidence) + [
         {
             "type": "text",
             "text": (
                 f"Context: product={context.product.value}, surface={context.surface or 'unknown'}, "
-                f"partner={context.partner or 'unknown'}, artifact kind={kind}. "
-                "Extract all claims and disclosures now."
+                f"partner={context.partner or 'unknown'}. "
+                "Extract all claims and disclosures from the screenshot now."
             ),
         }
     ]

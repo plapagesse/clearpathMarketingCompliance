@@ -1,12 +1,10 @@
-"""Extractor eval harness: runs extract() over every fixture mock and scores
-against the ground-truth answer key (fixtures/expected_findings.json).
+"""Extractor eval harness: runs extract() over every fixture mock screenshot
+and scores against the ground-truth answer key (fixtures/expected_findings.json).
 
-Run: python -m backend.engine.extractor.eval [--evidence-format png|html]
-Default evidence format is PNG — images are the platform's canonical evidence
-type. PNG resolution order per mock: (1) fixtures/<base>.png on this checkout,
-(2) fixtures/<base>.png on origin/agent4/screenshot-renders (fetched and
-materialized into a local cache), (3) LOUD WARNING + fall back to the .html
-source so the eval still runs end-to-end.
+Run: python -m backend.engine.extractor.eval
+The platform is image-only: evidence is fixtures/<base>.png, resolved locally.
+A missing PNG is a HARD error listing every missing file — remedy: run
+`python fixtures/render_screenshots.py`, or merge the screenshot-renders PR.
 
 Writes backend/engine/extractor/eval_report.json and prints a table.
 
@@ -34,13 +32,11 @@ Scoring (per fixtures/README.md semantics):
 
 from __future__ import annotations
 
-import argparse
 import csv
 import html as htmllib
 import json
 import os
 import re
-import subprocess
 import sys
 import unicodedata
 from pathlib import Path
@@ -53,8 +49,9 @@ from backend.engine.extractor.extract import ExtractionContext, extract
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURES = REPO_ROOT / "fixtures"
 REPORT_PATH = Path(__file__).parent / "eval_report.json"
-RENDER_CACHE = Path(__file__).parent / ".render_cache"
-RENDERS_BRANCH = "agent4/screenshot-renders"
+MISSING_PNG_REMEDY = (
+    "run `python fixtures/render_screenshots.py`, or merge the screenshot-renders PR"
+)
 
 _PUNCT_MAP = str.maketrans({
     "—": "-", "–": "-", "−": "-",              # em/en dash, minus -> hyphen
@@ -71,30 +68,26 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().casefold()
 
 
-def _resolve_evidence(fname: str, fmt: str) -> tuple[Path, str]:
-    """Resolve the evidence file for a mock. Returns (path, actual_format)."""
-    base = fname.replace(".html", "")
-    if fmt == "png":
-        local = FIXTURES / f"{base}.png"
-        if local.exists():
-            return local, "png"
-        cached = RENDER_CACHE / f"{base}.png"
-        if not cached.exists():
-            RENDER_CACHE.mkdir(exist_ok=True)
-            if not getattr(_resolve_evidence, "_fetched", False):
-                subprocess.run(["git", "fetch", "origin", RENDERS_BRANCH],
-                               cwd=REPO_ROOT, capture_output=True)
-                _resolve_evidence._fetched = True
-            got = subprocess.run(
-                ["git", "show", f"origin/{RENDERS_BRANCH}:fixtures/{base}.png"],
-                cwd=REPO_ROOT, capture_output=True)
-            if got.returncode == 0 and got.stdout:
-                cached.write_bytes(got.stdout)
-        if cached.exists():
-            return cached, "png"
-        print(f"WARNING: no PNG render for {base} (locally or on origin/{RENDERS_BRANCH}) — "
-              f"FALLING BACK to HTML source. Rendered-screenshot eval pending.", file=sys.stderr)
-    return FIXTURES / fname, "html"
+def _resolve_screenshots(fnames: list[str]) -> dict[str, Path]:
+    """Map each mock key (…html basename, per the answer key) to its local PNG.
+
+    Image-only platform: a missing render is a HARD error, raised up front for
+    ALL missing files so one run reports the full remedy list."""
+    resolved: dict[str, Path] = {}
+    missing: list[str] = []
+    for fname in fnames:
+        png = FIXTURES / (fname.replace(".html", "") + ".png")
+        if png.exists():
+            resolved[fname] = png
+        else:
+            missing.append(png.name)
+    if missing:
+        raise FileNotFoundError(
+            "missing screenshot renders in fixtures/: "
+            + ", ".join(sorted(missing))
+            + f" — {MISSING_PNG_REMEDY}"
+        )
+    return resolved
 
 
 def _load_manifest() -> dict[str, dict]:
@@ -112,7 +105,7 @@ def _load_manifest() -> dict[str, dict]:
     return out
 
 
-def run_eval(evidence_format: str = "png") -> dict:
+def run_eval() -> dict:
     load_dotenv(REPO_ROOT / ".env")
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("ANTHROPIC_API_KEY not set (env or .env) — live eval cannot run.", file=sys.stderr)
@@ -121,10 +114,10 @@ def run_eval(evidence_format: str = "png") -> dict:
     key = json.loads((FIXTURES / "expected_findings.json").read_text())
     entries = {k: v for k, v in key.items() if not k.startswith("_")}
     manifest = _load_manifest()
+    screenshots = _resolve_screenshots(sorted(entries))  # hard error if any PNG missing
 
     per_mock: list[dict] = []
     tot_universe = tot_span = tot_type = tot_unmatched = 0
-    formats_used: dict[str, int] = {}
 
     for fname, entry in sorted(entries.items()):
         meta = manifest.get(fname, {"product": entry.get("product", "personal_loan"), "surface": "", "partner": "", "mode": entry.get("mode", "")})
@@ -134,9 +127,7 @@ def run_eval(evidence_format: str = "png") -> dict:
             partner=meta["partner"],
             evidence_id=fname.replace(".html", ""),
         )
-        evidence_path, actual_fmt = _resolve_evidence(fname, evidence_format)
-        formats_used[actual_fmt] = formats_used.get(actual_fmt, 0) + 1
-        result = extract(evidence_path, ctx)
+        result = extract(screenshots[fname], ctx)
         claims = result.claims
 
         expected = [
@@ -173,7 +164,6 @@ def run_eval(evidence_format: str = "png") -> dict:
         unmatched = len(claims) - len(matched_claim_ids)
         per_mock.append({
             "mock": fname, "mode": meta["mode"],
-            "evidence_format": actual_fmt,
             "expected_claim_anchored": len(expected),
             "span_matched": span_hits, "type_correct": type_hits,
             "claims_extracted": len(claims),
@@ -186,14 +176,13 @@ def run_eval(evidence_format: str = "png") -> dict:
         tot_span += span_hits
         tot_type += type_hits
         tot_unmatched += unmatched
-        print(f"{fname} [{actual_fmt}]: {span_hits}/{len(expected)} spans, {type_hits} types ok, "
+        print(f"{fname}: {span_hits}/{len(expected)} spans, {type_hits} types ok, "
               f"{len(claims)} claims, {len(result.disclosures)} disclosures")
 
     report = {
         "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
         "claims_are_multi_label": True,  # amendment #4: expected type scored by MEMBERSHIP in claim_types
-        "evidence_format_requested": evidence_format,
-        "evidence_formats_used": formats_used,
+        "evidence_format": "png",  # image-only platform
         "universe_claim_anchored_findings": tot_universe,
         "claim_recall": round(tot_span / tot_universe, 3) if tot_universe else None,
         "type_accuracy_on_matched": round(tot_type / tot_span, 3) if tot_span else None,
@@ -214,8 +203,4 @@ def run_eval(evidence_format: str = "png") -> dict:
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Extractor eval over fixture mocks")
-    ap.add_argument("--evidence-format", choices=["png", "html"], default="png",
-                    help="png (canonical; falls back per-mock with a warning) or html")
-    args = ap.parse_args()
-    run_eval(evidence_format=args.evidence_format)
+    run_eval()
