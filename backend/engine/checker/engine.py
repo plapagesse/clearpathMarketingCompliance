@@ -241,10 +241,35 @@ def _phrase_conditional(rule: RulebookEntry, ctx: _Ctx) -> None:
         return
 
     violates_when = p.get("violates_when")
-    violating_cells = [
-        c.offer_id for c, v in zip(ctx.cells, values)
-        if v == violates_when
-    ] if len(values) == len(ctx.cells) else (["(derived)"] if values and values[0] == violates_when else [])
+    if len(values) == len(ctx.cells) and len(ctx.cells) > 1:
+        # Multi-cell semantics (v2026.08.4): ALL referenced cells violating ->
+        # full-severity violation; NONE -> pass; MIXED -> needs_verification at
+        # medium (the phrase may lawfully describe the non-violating cell —
+        # attribution cannot be decided deterministically).
+        matches = [v == violates_when for v in values]
+        if not any(matches):
+            return
+        if not all(matches):
+            mixed_cells = [c.offer_id for c, m in zip(ctx.cells, matches) if m]
+            clean_cells = [c.offer_id for c, m in zip(ctx.cells, matches) if not m]
+            for hit, claim_id in detections:
+                ctx.emit(
+                    rule, CheckClass.LEGALITY,
+                    f"Needs verification: '{hit}' — mixed referenced offers on {p['condition_field']}",
+                    f"{rule.explanation} '{hit}' may refer to the non-violating cell(s) "
+                    f"{', '.join(clean_cells)}; cells {', '.join(mixed_cells)} would make it a "
+                    "violation. Verify which offer the phrase describes.",
+                    severity=Severity.MEDIUM,
+                    claim_id=claim_id,
+                    dedupe_key=("phrase", claim_id, normalize(hit)),
+                )
+            return
+        violating_cells = [c.offer_id for c in ctx.cells]
+    else:
+        violating_cells = [
+            c.offer_id for c, v in zip(ctx.cells, values)
+            if v == violates_when
+        ] if len(values) == len(ctx.cells) else (["(derived)"] if values and values[0] == violates_when else [])
     if not violating_cells:
         return
 
@@ -377,17 +402,37 @@ def _proximity_required(rule: RulebookEntry, ctx: _Ctx, params: dict | None = No
             pass
 
     check_anchors = anchors[:1] if "first" in requirement.lower() else anchors
-    for a_start, a_end, a_text in check_anchors:
-        ok = any(
+
+    def _near(spans, a_start, a_end):
+        return any(
             (c_start - a_end) <= window and (a_start - c_end) <= window
-            for c_start, c_end, _ in companions
+            for c_start, c_end, _ in spans
         )
+
+    mode = p.get("companions_require", "any")
+    for a_start, a_end, a_text in check_anchors:
+        if mode == "all":
+            # Every companion PATTERN that matches anywhere in the text must
+            # also match within the window — a proximate alternative phrasing
+            # cannot satisfy on behalf of a distant one (v2026.08.4).
+            missing = []
+            for pat in p["companion_patterns"]:
+                spans = pattern_spans([pat], ctx.text)
+                if spans and not _near(spans, a_start, a_end):
+                    missing.append(spans[0][2])
+            ok = not missing
+            detail = (
+                f"Companion content present in the artifact but not proximate to "
+                f"'{a_text}': {', '.join(repr(m) for m in missing)}." if missing else ""
+            )
+        else:
+            ok = _near(companions, a_start, a_end)
+            detail = f"No companion within ~{window} characters of '{a_text}'."
         if not ok:
             ctx.emit(
                 rule, CheckClass.LEGALITY,
                 f"'{a_text}' lacks its required companion in proximity",
-                f"{rule.explanation} Requirement: {requirement} "
-                f"No companion within ~{window} characters of '{a_text}'.",
+                f"{rule.explanation} Requirement: {requirement} {detail}",
                 suggested_redline="Move the required companion text into immediate proximity of the anchor.",
             )
     return True

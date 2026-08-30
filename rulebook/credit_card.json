@@ -75,7 +75,8 @@
         "decision_inputs": "text_plane",
         "anchor_patterns": "@patterns.promo_rate_mentions",
         "companion_patterns": "@patterns.promo_end_and_post_rate",
-        "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate."
+        "requirement": "The promo end date/period and the post-promotional APR (or range) must appear closely proximate to the FIRST listing of the promotional rate.",
+        "companions_require": "all"
       },
       "authorities": [
         {

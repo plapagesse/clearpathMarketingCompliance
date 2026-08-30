@@ -139,7 +139,10 @@ PRIMITIVES: dict[str, dict] = {
             "companion_patterns": _is_str_list,
             "requirement": lambda v: isinstance(v, str),
         },
-        "optional": {},
+        # companions_require (v2026.08.4): "any" (default) = one proximate
+        # companion satisfies the anchor; "all" = every companion pattern that
+        # matches anywhere in the text must also match within the window.
+        "optional": {"companions_require": lambda v: v in ("any", "all")},
         "pattern_key": None,
     },
     "ground_truth_consistency": {
