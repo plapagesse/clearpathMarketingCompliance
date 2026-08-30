@@ -2,53 +2,27 @@
 
 AI-assisted marketing-compliance review platform for a consumer lender (ClearPath Financial: personal loans, credit cards, mortgage prequalification). Partner marketing placements (offer cards, prescreen emails, rate tables) are ingested, their claims and disclosures extracted by a multimodal LLM, checked deterministically against a **cited regulatory rulebook** (legality), a **versioned offer matrix** (truthfulness), and the **approved baseline** (fidelity), then passed through an LLM judgment layer for gray areas. Findings land in a human review queue with accept/override decisions and an immutable, exam-exportable audit trail, replacing the Excel-and-email process that bottlenecks the compliance team.
 
-The core data relationship in one glance: claims are multi-label, and each legal type activates its own set of checks.
+The core data relationship in one glance: a claim is multi-label, and each claim type activates its own set of rules.
 
 ```mermaid
 flowchart LR
-    C["One claim:<br/>0% intro APR for 15 months"]
-    T1["promotional_or_introductory"]
-    T2["triggering_term"]
-    R1["CC-INTRO-001<br/>intro label adjacency"]
-    R2["CC-INTRO-002<br/>promo end date and post-promo APR"]
-    R3["CC-TRUTH-001<br/>offer matrix truthfulness"]
-    R4["CC-TRIG-001<br/>open-end companion disclosures"]
-    R5["PL-TRIG-001<br/>closed-end companion disclosures"]
+    C["Claim"]
+    T1["Claim type"]
+    T2["Claim type"]
+    R1["Rule"]
+    R2["Rule"]
+    R3["Rule"]
+    R4["Rule"]
 
     C --> T1
     C --> T2
     T1 --> R1
     T1 --> R2
-    T1 --> R3
+    T2 --> R3
     T2 --> R4
-    T2 --> R5
 ```
 
 **Reading order:** the pipeline diagram below, then [Design decisions](#design-decisions) (why the system is shaped this way), then [Repo map](#repo-map) and [Install & run](#install--run). Deep references: [CONTRACTS.md](CONTRACTS.md) (data shapes), [rulebook/README.md](rulebook/README.md) (rule anatomy and the 8 primitives), [rulebook/PROVENANCE.md](rulebook/PROVENANCE.md) (every rule traced to its body of law).
-
-## UI walkthrough
-
-How a compliance reviewer moves through the app, in the order the workflow intends. The demo below is seeded from `fixtures/`.
-
-Work starts on the **Inputs** tab. Every partner placement is a card: the creative itself, a lifecycle chip (proposed mock or production capture), an AI chip carrying the verdict of the latest automated check, and a human chip carrying the reviewer's decision. Four dropdowns filter the grid by product, partner, input type, and AI status. Ticking card checkboxes raises a batch bar, and one click runs the AI review on every unchecked selection; here two cards are selected and the bar offers to run them both.
-
-![Inputs grid with the four filters, two cards selected, and the batch Run AI bar](docs/walkthrough/inputs-grid.png)
-
-Clicking a card opens it. The evidence screenshot sits on the left, exactly as captured; the right rail stacks the metadata (product, partner, surface, submitted date, SLA due date, headline), the AI REVIEW panel, the submission history, and the decision controls. Below is SUB-2026-0146, a personal-loan offer card whose creative promises guaranteed approval regardless of credit history, one of the planted violations in the demo set, shown fresh from intake before its first AI run. Run AI review sends it through the pipeline; each finding that comes back renders under an attention banner with the rule id that fired, a severity chip, a plain-English summary, a suggested redline when the judge offers one, and a link to the exact legal citation.
-
-![Submission detail for SUB-2026-0146 with evidence left and metadata, AI review, history, and decision right](docs/walkthrough/submission-detail.png)
-
-The **Rulebook** tab renders the checker's actual loaded rulebook: versioned data, not code, with the version in force and the rule count pinned at the top. Each rule is one plain-English sentence plus a severity chip, the product it applies to, its rule id, and a pinpoint citation linking to the regulation. Automated checks and judgment-based gray-area checks sit in separate sections, and the nine claim types that route extracted statements to rules are documented on the same page.
-
-![Rulebook tab showing versioned rules with severities and pinpoint citations](docs/walkthrough/rulebook-rules.png)
-
-At the bottom of the same tab sits propose-a-rule: a reviewer drafts the rule (product, title, what it should check, severity, citation URL, why now) and the proposal lands in a pending-review list. A proposal never applies live; it is promoted into the rulebook through review.
-
-![Propose-a-rule form with the pending-review list below it](docs/walkthrough/rulebook-propose.png)
-
-The **Review Queue** tab is the working view: instead of another list, it drops the reviewer straight into the first undecided submission, with the same four filters to scope the cycle and a live count of how many remain. The decision bar takes an optional note plus Approve or Reject, and Next / Skip passes without deciding. A decision removes the item from the queue and auto-advances to the next undecided one, so the whole queue can be cleared without ever going back to the grid.
-
-![Review Queue dropped into the first undecided submission with 16 remaining](docs/walkthrough/review-queue.png)
 
 ## The pipeline
 
@@ -154,6 +128,30 @@ The 13 `llm_judged` rules exist because some law is written as a standard, not a
 A lender's partner marketing runs two fundamentally different kinds of placement, and each needs its own ground truth. **Broad placements** (rate tables, offer cards, prescreen emails shown to a wide audience) advertise the *bounds* of what ClearPath offers: "APR as low as 8.99%". In the real world that envelope is a document the lender hands its partners, and it is not internal trivia; it ends up public. The Upstart ↔ Credit Karma promotion agreement on the public record moves exactly this object: its Exhibit C has rate updates flowing to the marketplace as an **"offer matrix" via shared Excel file** ([SEC EX-10.15](https://www.sec.gov/Archives/edgar/data/1647639/000119312520285895/d867925dex1015.htm)), and Credit Karma publishes the resulting lender-supplied APR ranges with "as of" dates on its [public disclosure pages](https://www.creditkarma.com/about/personal-loan-disclaimers). Our versioned offer matrix (`fixtures/offer_matrix.csv`) plays that role: every advertised rate, term, amount, and fee must land inside a referenced, unexpired cell (`ground_truth_consistency` rules like PL-TRUTH-001/CC-TRUTH-001).
 
 **Personalized placements** are the other kind: on a logged-in platform like Credit Karma, the ad's terms come from a real-time API call to the lender's engine, priced for the specific member viewing it. We built a deterministic mock of that engine (`backend/prequal/`) to emulate this flow: it prices a point *inside the matrix envelope* by construction and echoes `offer_cell_id` + matrix version, so a personalized rendering can be verified against exactly what was served to that user. This is the API-side reconciliation that proved the FTC's Credit Karma case. Verification mode adds one more comparison: a production capture is diffed against the approved baseline it should match (`baseline_submission_id`), and because every `CheckRun` pins the matrix version in force, a matrix change can trigger a re-validation sweep that catches placements that just went false. That is the Amerisave failure mode, automated.
+
+## UI walkthrough
+
+How a compliance reviewer moves through the app, in the order the workflow intends. The demo below is seeded from `fixtures/`.
+
+Work starts on the **Inputs** tab. Every partner placement is a card: the creative itself, a lifecycle chip (proposed mock or production capture), an AI chip carrying the verdict of the latest automated check, and a human chip carrying the reviewer's decision. Four dropdowns filter the grid by product, partner, input type, and AI status. Ticking card checkboxes raises a batch bar, and one click runs the AI review on every unchecked selection; here two cards are selected and the bar offers to run them both.
+
+![Inputs grid with the four filters, two cards selected, and the batch Run AI bar](docs/walkthrough/inputs-grid.png)
+
+Clicking a card opens it. The evidence screenshot sits on the left, exactly as captured; the right rail stacks the metadata (product, partner, surface, submitted date, SLA due date, headline), the AI REVIEW panel, the submission history, and the decision controls. Below is SUB-2026-0146, a personal-loan offer card whose creative promises guaranteed approval regardless of credit history, one of the planted violations in the demo set, shown fresh from intake before its first AI run. Run AI review sends it through the pipeline; each finding that comes back renders under an attention banner with the rule id that fired, a severity chip, a plain-English summary, a suggested redline when the judge offers one, and a link to the exact legal citation.
+
+![Submission detail for SUB-2026-0146 with evidence left and metadata, AI review, history, and decision right](docs/walkthrough/submission-detail.png)
+
+The **Rulebook** tab renders the checker's actual loaded rulebook: versioned data, not code, with the version in force and the rule count pinned at the top. Each rule is one plain-English sentence plus a severity chip, the product it applies to, its rule id, and a pinpoint citation linking to the regulation. Automated checks and judgment-based gray-area checks sit in separate sections, and the nine claim types that route extracted statements to rules are documented on the same page.
+
+![Rulebook tab showing versioned rules with severities and pinpoint citations](docs/walkthrough/rulebook-rules.png)
+
+At the bottom of the same tab sits propose-a-rule: a reviewer drafts the rule (product, title, what it should check, severity, citation URL, why now) and the proposal lands in a pending-review list. A proposal never applies live; it is promoted into the rulebook through review.
+
+![Propose-a-rule form with the pending-review list below it](docs/walkthrough/rulebook-propose.png)
+
+The **Review Queue** tab is the working view: instead of another list, it drops the reviewer straight into the first undecided submission, with the same four filters to scope the cycle and a live count of how many remain. The decision bar takes an optional note plus Approve or Reject, and Next / Skip passes without deciding. A decision removes the item from the queue and auto-advances to the next undecided one, so the whole queue can be cleared without ever going back to the grid.
+
+![Review Queue dropped into the first undecided submission with 16 remaining](docs/walkthrough/review-queue.png)
 
 ## Repo map
 
