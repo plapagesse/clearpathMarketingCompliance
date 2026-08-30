@@ -19,6 +19,11 @@ Invariants enforced:
   8. Every mock HTML has a sibling rendered PNG (same basename) of non-trivial
      size (>5KB) — PNGs are the canonical evidence artifacts the platform
      ingests; regenerate with render_screenshots.py.
+  9. Claim-anchored findings carry expected_normalized_fields whose keys are
+     declared normalized_fields names for the finding's expected_claim_type in
+     rulebook/claim_types_legal_map.json ('?' optional suffix stripped) and
+     whose values are JSON scalars (null allowed where the map defines null
+     semantics). Absence-type findings must NOT carry the field.
 
 Exit code 0 = all pass; 1 = any mismatch.
 """
@@ -50,6 +55,9 @@ CLAIM_TYPES = {
 # Observed canonical forms: PL-TRIG-001, PL-STATE-CAP-001, CC-PRESCREEN-001,
 # MTG-TI-001, XP-UDAAP-001-personal_loan (cross-product expansion suffix).
 RULE_ID_RE = re.compile(r"^(PL|CC|MTG|XP)-[A-Z]+(-[A-Z]+)*-\d{3}(-[a-z_]+)?$")
+
+# Merged on main; the fixtures worktree always contains it at the repo root.
+LEGAL_MAP = json.load(open(FX.parent / "rulebook" / "claim_types_legal_map.json"))["claim_types"]
 
 
 def normalized_text(raw_html: str) -> str:
@@ -102,6 +110,20 @@ def main() -> int:
                 for rid in rids:
                     if not isinstance(rid, str) or not RULE_ID_RE.match(rid):
                         errors.append(f"{label}: malformed rule_id '{rid}'")
+            nf = exp.get("expected_normalized_fields")
+            anchored = exp.get("claim_text") is not None and exp.get("expected_claim_type") is not None
+            if anchored:
+                if not isinstance(nf, dict) or not nf:
+                    errors.append(f"{label}: claim-anchored finding missing expected_normalized_fields")
+                else:
+                    declared = {k.rstrip("?") for k in LEGAL_MAP[exp["expected_claim_type"]].get("normalized_fields", {})}
+                    for k, v in nf.items():
+                        if k not in declared:
+                            errors.append(f"{label}: field '{k}' not declared for {exp['expected_claim_type']}")
+                        if not isinstance(v, (str, int, float, bool, type(None))):
+                            errors.append(f"{label}: field '{k}' value is not a JSON scalar")
+            elif nf is not None:
+                errors.append(f"{label}: absence-type finding must not carry expected_normalized_fields")
             ct = exp["claim_text"]
             if ct is None:
                 continue
