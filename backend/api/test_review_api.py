@@ -170,6 +170,46 @@ def test_list_carries_the_same_ai_summary_the_queue_items_have(client):
         assert queue_item[key] == processed[key]
 
 
+def _ids(client, query: str = "") -> set[str]:
+    return {r["submission_id"] for r in client.get("/api/review/submissions" + query).get_json()}
+
+
+def test_list_filters_by_ai_status(client):
+    """The fourth selector: which cards the AI has looked at, and how it went.
+
+    One submission per bucket, then assert the four buckets partition the census
+    — so a card can be reached by exactly one setting of the selector.
+    """
+    census = set(_census())
+    issues_id, review_id, clean_id = sorted(census)[:3]
+    _add_check_run(issues_id, ["low", "high"], run_id="cr-ai-issues")
+    _add_check_run(review_id, ["medium"], run_id="cr-ai-review")
+    _add_check_run(clean_id, ["info"], run_id="cr-ai-clean")
+
+    assert _ids(client, "?ai_status=issues") == {issues_id}
+    assert _ids(client, "?ai_status=review") == {review_id}
+    assert _ids(client, "?ai_status=clean") == {clean_id}
+    assert _ids(client, "?ai_status=not_checked") == census - {issues_id, review_id, clean_id}
+    assert _ids(client) == census
+
+    # Same closed-vocabulary contract as input_type: a typo is a 400, not a
+    # silently unfiltered list.
+    assert client.get("/api/review/submissions?ai_status=banana").status_code == 400
+
+
+def test_ai_status_composes_with_the_other_selectors(client):
+    """ai_status narrows what the other three already selected, not the whole table."""
+    checked_id = sorted(_census())[0]
+    _add_check_run(checked_id, ["critical"], run_id="cr-ai-combo")
+    partner = _census()[checked_id].partner
+
+    assert _ids(client, f"?ai_status=issues&partner={partner}") == {checked_id}
+    # ...and a partner that owns no flagged card comes back empty rather than
+    # falling through to the unfiltered list.
+    other = next(p for p in {s.partner for s in _census().values()} if p != partner)
+    assert _ids(client, f"?ai_status=issues&partner={other}") == set()
+
+
 def test_list_filters_by_input_type(client):
     for wanted in ("proposed", "production"):
         rows = client.get(f"/api/review/submissions?input_type={wanted}").get_json()

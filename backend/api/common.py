@@ -53,6 +53,37 @@ def filter_by_input_type(stmt, value: str):
     return stmt.where(SubmissionRow.mode != PRODUCTION_MODE)
 
 
+# The four buckets the input grid's AI-status selector offers, mapped onto the
+# attention value ai_summary() produces — so the selector and the chip on the
+# card are two readings of one number, and can never disagree.
+AI_STATUSES = ("not_checked", "clean", "review", "issues")
+ATTENTION_FOR_STATUS = {
+    "clean": "quick_check",
+    "review": "needs_attention",
+    "issues": "high_attention",
+}
+
+
+def ai_status_filter(value: str):
+    """A card predicate for one AI-status bucket. Empty value keeps everything.
+
+    Returns a predicate rather than narrowing a select, because the bucket is
+    derived from the submission's latest CheckRun by ai_summary() — it only
+    exists once the row has been serialized. Validating here still raises before
+    the query runs, and outside the closed vocabulary it raises ValueError like
+    filter_by_input_type, so a typo'd query string is a 400 rather than a
+    silently unfiltered list.
+    """
+    if not value:
+        return lambda card: True
+    if value not in AI_STATUSES:
+        raise ValueError(f"ai_status must be one of {list(AI_STATUSES)}")
+    if value == "not_checked":
+        return lambda card: card.get("ai_status") != "processed"
+    wanted = ATTENTION_FOR_STATUS[value]
+    return lambda card: card.get("ai_status") == "processed" and card.get("attention") == wanted
+
+
 def days_ago(day: date | None) -> int | None:
     """Whole days since the submission landed. 0 is today; None if undated."""
     if day is None:

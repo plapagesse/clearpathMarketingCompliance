@@ -1,7 +1,7 @@
 """Flask blueprint backing the reviewer input view at /api/review.
 
 Three endpoints, all thin wrappers over the seeded submissions table:
-  GET  /api/review/submissions            list (optional product/partner/input_type)
+  GET  /api/review/submissions            list (optional product/partner/input_type/ai_status)
   POST /api/review/submissions            multipart upload -> new SubmissionRow
   GET  /api/review/evidence/<filename>    serve a screenshot (uploads/, then fixtures/)
 
@@ -24,6 +24,7 @@ from flask import Blueprint, jsonify, request, send_from_directory
 from sqlalchemy import select
 
 from backend.api.common import (
+    ai_status_filter,
     ai_summary,
     days_ago,
     filter_by_input_type,
@@ -70,14 +71,20 @@ def _serialize(session, row: SubmissionRow) -> dict:
 
 @review_bp.get("/submissions")
 def list_submissions():
-    """Query params: product, partner, input_type (all optional, exact match).
+    """Query params: product, partner, input_type, ai_status (all optional, exact match).
 
     Oldest first, matching the queue: the grid and the queue walk the backlog in
     the same order, so "the next thing to look at" means the same in both views.
+
+    Three of the four filters narrow the query; ai_status can't, because a
+    submission's bucket is a property of its latest CheckRun, computed per row by
+    ai_summary(). It is applied to the serialized cards instead, which keeps one
+    definition of "what the AI thinks of this" rather than a second one in SQL.
     """
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
     wanted_type = (request.args.get("input_type") or "").strip()
+    wanted_ai = (request.args.get("ai_status") or "").strip()
 
     stmt = select(SubmissionRow)
     if product:
@@ -86,6 +93,7 @@ def list_submissions():
         stmt = stmt.where(SubmissionRow.partner == partner)
     try:
         stmt = filter_by_input_type(stmt, wanted_type)
+        keep = ai_status_filter(wanted_ai)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     stmt = stmt.order_by(SubmissionRow.date_submitted.asc(), SubmissionRow.submission_id)
@@ -93,7 +101,8 @@ def list_submissions():
     session = open_session()
     try:
         rows = session.execute(stmt).scalars().all()
-        return jsonify([_serialize(session, row) for row in rows])
+        cards = (_serialize(session, row) for row in rows)
+        return jsonify([card for card in cards if keep(card)])
     finally:
         session.close()
 

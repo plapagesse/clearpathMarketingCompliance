@@ -34,6 +34,16 @@ const PRODUCTS = [
   { value: 'mortgage_prequal', label: 'Mortgage prequal' },
 ]
 
+// The AI-status selector's buckets. Values are the server's closed vocabulary;
+// labels repeat the chip wording, so filtering by "AI: issues" picks out exactly
+// the cards wearing that chip.
+const AI_STATUSES = [
+  { value: 'not_checked', label: 'Not checked' },
+  { value: 'clean', label: 'AI: clean' },
+  { value: 'review', label: 'AI: review' },
+  { value: 'issues', label: 'AI: issues' },
+]
+
 // Batch reviews in flight at once — bounded to respect API rate limits and keep failures isolated.
 const BATCH_CONCURRENCY = 4
 
@@ -51,6 +61,7 @@ function InputView() {
   const [product, setProduct] = useState('')
   const [partner, setPartner] = useState('')
   const [inputType, setInputType] = useState('')
+  const [aiStatus, setAiStatus] = useState('')
   const [cards, setCards] = useState<SubmissionCard[]>([])
   const [partners, setPartners] = useState<string[]>([])
   const [loadError, setLoadError] = useState('')
@@ -84,9 +95,11 @@ function InputView() {
     if (product) params.set('product', product)
     if (partner) params.set('partner', partner)
     if (inputType) params.set('input_type', inputType)
+    if (aiStatus) params.set('ai_status', aiStatus)
 
     // A reload can hide a ticked card; a stale selection would then run the AI
-    // on something the reviewer can no longer see.
+    // on something the reviewer can no longer see. Every filter runs through
+    // here, so no selector can leave Select-all pointing at hidden cards.
     setSelected([])
     setBatchNote('')
     setLoadError('')
@@ -104,7 +117,7 @@ function InputView() {
       .catch(() => setPartners([]))
   }
 
-  useEffect(load, [product, partner, inputType])
+  useEffect(load, [product, partner, inputType, aiStatus])
 
   useEffect(() => {
     if (!openId) {
@@ -349,6 +362,18 @@ function InputView() {
             <option value="">All input types</option>
             <option value="proposed">Proposed</option>
             <option value="production">Production</option>
+          </select>
+        </label>
+
+        <label className="filter">
+          AI status
+          <select value={aiStatus} onChange={(e) => setAiStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            {AI_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
           </select>
         </label>
 
