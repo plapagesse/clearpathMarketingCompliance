@@ -50,7 +50,7 @@
           "XP-UDAAP-001-personal_loan"
         ],
         "expected_normalized_fields": {
-          "badge_word": "guaranteed",
+          "badge_word": "guaranteed approval",
           "strength": "guaranteed"
         },
         "location_note": "green emphasis line below the APR line",
