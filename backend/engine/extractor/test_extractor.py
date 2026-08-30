@@ -344,9 +344,21 @@ def test_payload_validation_rejects_unknown_key():
             {"badge_word": "pre-approved"}))
 
 
-def test_payload_validation_rejects_missing_required():
-    with pytest.raises(ValidationError):
+def test_rate_claim_requires_value_or_range():
+    """Cross-field contract: a rate_or_apr claim carries value_pct OR a full
+    range (range_min_pct + range_max_pct). Range-only claims ('Rates from
+    11.49% to 35.99%') are legitimate; neither is a hard failure."""
+    # value-only passes
+    validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"value_pct": 8.99}))
+    # range-only passes
+    validate_claim_payload(_claim([ClaimType.RATE_OR_APR],
+        {"range_min_pct": 11.49, "range_max_pct": 35.99}))
+    # neither fails with the cross-field message
+    with pytest.raises(ValueError, match="rate claim requires value_pct or a range"):
         validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"is_floor_claim": True}))
+    # a half range does not satisfy the contract either
+    with pytest.raises(ValueError, match="rate claim requires value_pct or a range"):
+        validate_claim_payload(_claim([ClaimType.RATE_OR_APR], {"range_min_pct": 11.49}))
 
 
 def test_payload_validation_rejects_wrong_type():

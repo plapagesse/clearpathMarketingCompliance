@@ -79,8 +79,8 @@
    "normalized_fields": {
     "value_pct": {
      "type": "number",
-     "description": "the single rate figure; for floor claims the floor value",
-     "optional": false
+     "description": "the single rate figure; for floor claims the floor value. A rate claim must carry value_pct OR a range (range_min_pct + range_max_pct); range-only claims omit it",
+     "optional": true
     },
     "range_min_pct": {
      "type": "number",
