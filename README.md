@@ -202,3 +202,15 @@ The live suites, `backend/test_e2e_pipeline.py` and the extractor eval (`python 
 ## Deployment
 
 One service: Flask serves the built React bundle (no CORS, one URL). `Procfile` runs `gunicorn backend.app:app` for Railway/Fly-style hosts; SQLite is seeded from `fixtures/` via `python -m backend.db.seed`, so ephemeral disks reset to a clean demo state on redeploy. Deployed-URL specifics land here with the final deploy pass.
+
+## Proposed next steps
+
+Neither of these exists yet: they are the two extensions we would build next, and both lean on contracts the platform already ships.
+
+### A self-maintaining rulebook
+
+[rulebook/PROVENANCE.md](rulebook/PROVENANCE.md) is already a projection of a legal knowledge graph: rules and claim types joined to structured pinpoint authorities. The proposal is to persist that graph at pinpoint granularity (provisions, amendments, official interpretations, guidance documents, enforcement actions) and run a monitoring pipeline over the primary sources; the watched surface is small, so change detection is a few CFR parts polled through the eCFR and Federal Register APIs, content hashes on cited guidance pages, and the CFPB and FTC enforcement feeds. A detected change looks up exactly which rules cite the touched pinpoint, an LLM triages materiality, and material changes become LLM-drafted rule patches that must pass `rulebook/validate_rulebook.py` and the fixture suites before a human ever sees them. Patches land as proposals in the existing propose-review-promote queue on the Rulebook tab, never applied automatically; claim types are the constitutive ontology, so changes touching them surface as advisory review items only.
+
+### Automated placement capture
+
+Production captures today come from seed accounts submitted by hand. The proposal is a browsing agent swarm pointed at a partner's site or app with the partner URL as the only input: agents navigate like a consumer, locate ClearPath placements, and screenshot them with timestamp and context. Each capture enters through the existing intake as a verification-mode input, so the same check engine that reviews pre-publication mocks continuously re-verifies what is actually being rendered. This is the platform's core bet cashed in: screenshots are the one evidence contract that generalizes across every partner surface, so any agent that can see a page can feed the pipeline.
