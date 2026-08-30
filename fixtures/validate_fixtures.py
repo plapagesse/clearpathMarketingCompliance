@@ -16,6 +16,9 @@ Invariants enforced:
      (absence-type findings anchor to no claim).
   7. expected_rule_ids is a non-empty list of canonical rulebook v2026.08.3
      rule_ids matching the rule-id pattern.
+  8. Every mock HTML has a sibling rendered PNG (same basename) of non-trivial
+     size (>5KB) — PNGs are the canonical evidence artifacts the platform
+     ingests; regenerate with render_screenshots.py.
 
 Exit code 0 = all pass; 1 = any mismatch.
 """
@@ -59,7 +62,8 @@ def normalized_text(raw_html: str) -> str:
 def main() -> int:
     key = json.load(open(FX / "expected_findings.json"))
     mocks = {k: v for k, v in key.items() if not k.startswith("_")}
-    subs = {r["asset_files"]: r for r in csv.DictReader(open(FX / "submissions.csv"))}
+    subs = {next(a for a in r["asset_files"].split(";") if a.endswith(".html")): r
+            for r in csv.DictReader(open(FX / "submissions.csv"))}
     errors: list[str] = []
 
     for f in mocks:
@@ -104,6 +108,13 @@ def main() -> int:
             probe = re.sub(r"\s+", " ", htmllib.unescape(ct)).strip()
             if probe not in text:
                 errors.append(f"{label}: claim_text not literal in mock: '{probe}'")
+
+    for f in mocks:
+        png = (FX / f).with_suffix(".png")
+        if not png.exists():
+            errors.append(f"{f}: missing sibling PNG render ({png.name})")
+        elif png.stat().st_size <= 5000:
+            errors.append(f"{f}: PNG render suspiciously small ({png.stat().st_size}B)")
 
     for f, meta in mocks.items():
         if "compliant" in f and meta["expected_findings"]:
