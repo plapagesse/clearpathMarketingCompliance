@@ -358,7 +358,7 @@ def compliant_pl_claims() -> list[Claim]:
             "You're prequalified for up to $50,000",
             "headline",
             ev,
-            {"badge_word": "prequalified", "strength": "prequalified"},
+            {},
         ),
         make_claim(
             "clm-pl0142-001",
@@ -417,9 +417,6 @@ def cc_intro_claims() -> list[Claim]:
             {
                 "promo_rate_pct": 0.0,
                 "promo_period_months": 15,
-                "has_intro_word": False,
-                "is_deferred_interest": False,
-                "post_promo_rate_stated": True,
             },
         ),
         make_claim(
@@ -428,7 +425,7 @@ def cc_intro_claims() -> list[Claim]:
             CC_FEE_CLAIM_TEXT,
             "bold subheadline",
             ev,
-            {"fee_claim_kind": "absence_of_fee", "fee_type": "annual_fee"},
+            {"fee_type": "annual_fee"},
         ),
     ]
 
@@ -470,7 +467,7 @@ def preapproved_claims() -> list[Claim]:
             "You're pre-approved for up to $50,000",
             "headline",
             ev,
-            {"badge_word": "pre-approved", "strength": "pre_approved"},
+            {},
         ),
         make_claim(
             "clm-pl0146-001",
@@ -478,7 +475,7 @@ def preapproved_claims() -> list[Claim]:
             "Guaranteed approval — regardless of credit history",
             "emphasis line below the APR line",
             ev,
-            {"badge_word": "guaranteed approval", "strength": "guaranteed"},
+            {},
         ),
     ]
 
@@ -510,7 +507,7 @@ def mortgage_claims() -> list[Claim]:
             "Lock in a fixed low rate of 6.250%",
             "headline",
             ev,
-            {"applies_to_rate": True, "fixed_period_stated": None},
+            {},
         ),
         make_claim(
             "clm-mtg0150-001",
@@ -518,7 +515,7 @@ def mortgage_claims() -> list[Claim]:
             "Pay just $2,463/month on a $400,000 loan",
             "subheadline",
             ev,
-            {"payment_amount": 2463.0},
+            {},
         ),
     ]
 
