@@ -110,9 +110,8 @@ def test_curly_apostrophes_normalize_to_straight(rulebook, real_cells):
         "Your application can’t be denied",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION, ClaimType.GENERAL_UDAAP_REPRESENTATION],
         # arbitrated: claim must satisfy the payload contract; normalization
-        # intent unchanged.
-        {"badge_word": "can’t be denied", "strength": "guaranteed",
-         "representation_kind": "other"},
+        # intent unchanged. (Both listed types now carry empty payloads.)
+        {},
     )
     result = run(
         rulebook,

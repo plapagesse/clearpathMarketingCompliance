@@ -17,7 +17,7 @@ def guaranteed_claim():
     return make_claim(
         "Guaranteed approval — regardless of credit history",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION],
-        {"badge_word": "guaranteed approval", "strength": "guaranteed"},
+        {},
     )
 
 

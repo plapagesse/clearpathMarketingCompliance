@@ -40,7 +40,7 @@ def payment_claim():
     return make_claim(
         "Borrow $10,000 for just $299/mo",
         [ClaimType.TRIGGERING_TERM],
-        {"payment_amount": 299},
+        {},
     )
 
 
@@ -96,7 +96,7 @@ def test_no_downpayment_required_is_not_a_trigger(rulebook, real_cells):
     claim = make_claim(
         "No downpayment required",
         [ClaimType.GENERAL_UDAAP_REPRESENTATION],
-        {"representation_kind": "other"},
+        {},
     )
     result = run(
         rulebook,
@@ -118,7 +118,7 @@ def test_prequalified_requires_not_guaranteed_qualifier(rulebook, real_cells):
     claim = make_claim(
         "You're prequalified for up to $50,000",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION],
-        {"badge_word": "prequalified", "strength": "prequalified"},
+        {},
     )
     kwargs = dict(
         submission=sub,
@@ -146,7 +146,7 @@ def test_prohibited_phrase_on_claim_fires_with_rule_metadata(rulebook, real_cell
     claim = make_claim(
         "Guaranteed approval — regardless of credit history",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION],
-        {"badge_word": "guaranteed approval", "strength": "guaranteed"},
+        {},
     )
     result = run(
         rulebook,
@@ -167,7 +167,7 @@ def test_prohibited_phrase_matching_is_case_insensitive(rulebook, real_cells):
     claim = make_claim(
         "GUARANTEED APPROVAL FOR EVERY APPLICANT",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION],
-        {"badge_word": "GUARANTEED APPROVAL", "strength": "guaranteed"},
+        {},
     )
     result = run(
         rulebook,
@@ -221,7 +221,7 @@ def preapproved_claim():
     return make_claim(
         "You're pre-approved for up to $50,000",
         [ClaimType.APPROVAL_OR_PREQUALIFICATION],
-        {"badge_word": "pre-approved", "strength": "pre_approved"},
+        {},
     )
 
 
