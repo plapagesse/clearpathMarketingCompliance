@@ -184,7 +184,7 @@ function RulebookView() {
       </section>
 
       <section>
-        <h2>More judgment-based checks (gray area)</h2>
+        <h2>Judgment-based checks (gray area)</h2>
         <p className="rb-lede">
           Reviewed by the AI against the cited standard — findings are flags for a human, never
           automatic verdicts.
