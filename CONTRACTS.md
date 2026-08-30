@@ -19,7 +19,7 @@ One machine-actionable compliance rule: which `product` and `claim_types` it sub
 One row of the offer matrix — the versioned ground truth of what ClearPath is allowed to claim through a partner (APR range, terms, amounts, fees, permitted badge designation, `is_firm_offer`, excluded states, effective window). Truthfulness checks compare claims against this.
 
 ### `Submission`
-One review request: an evidence artifact plus its context bundle (partner, product, surface, states, template id/version, offer cells referenced, dynamic slots, disclosures the partner says are included, asset files, SLA). `mode` distinguishes `pre_publication` (partner mock awaiting approval) from `verification` (live-placement evidence, e.g. a seed-account screenshot).
+One review request: an evidence artifact plus its context bundle (partner, product, surface, states, template id/version, offer cells referenced, dynamic slots, disclosures the partner says are included, asset files, SLA). `mode` distinguishes `pre_publication` (partner mock awaiting approval) from `verification` (live-placement evidence, e.g. a seed-account screenshot). For `verification` submissions, `baseline_submission_id` names the APPROVED submission the evidence is diffed against — the fidelity check's join key. *(Amendment #3, PR #1: added `baseline_submission_id: str | None`.)*
 
 ### `Finding`
 One issue raised against a submission. `check_class` says which engine raised it: `legality` (vs. rulebook), `truthfulness` (vs. offer matrix / served response), `fidelity` (vs. approved baseline), `judgment` (LLM gray-area). Carries severity, the rule and claim it references, a citation URL, an optional `suggested_redline`, and a reviewer `status` (open / accepted / overridden).
