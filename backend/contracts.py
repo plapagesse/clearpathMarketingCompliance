@@ -29,9 +29,9 @@ class Product(str, Enum):
 class ClaimType(str, Enum):
     """Legal-entity taxonomy: each value names the body of law that governs the claim.
 
-    A text span embodying two legal categories yields two Claim objects (extractor
-    convention — no multi-label claims). Anchors documented in CONTRACTS.md and
-    rulebook/claim_types_legal_map.json.
+    Claims are MULTI-LABEL (amendment #4): one statement = one Claim object,
+    carrying every legal category it embodies in `claim_types`. Anchors
+    documented in CONTRACTS.md and rulebook/claim_types_legal_map.json.
     """
 
     TRIGGERING_TERM = "triggering_term"                          # Reg Z 1026.24(d) / 1026.16(b)
@@ -104,7 +104,14 @@ class Claim(BaseModel):
     """One marketing claim extracted from an evidence artifact."""
 
     id: str
-    claim_type: ClaimType
+    claim_types: list[ClaimType] = Field(
+        min_length=1,
+        description=(
+            "Every legal category this statement embodies (amendment #4: one "
+            "statement = one claim object; a span embodying multiple legal "
+            "categories lists them all — the old two-objects convention is REPLACED)"
+        ),
+    )
     text: str = Field(description="Verbatim claim text as rendered")
     location: str = Field(description="Where in the artifact (e.g. 'headline', 'fine print', 'badge')")
     source_evidence_id: str

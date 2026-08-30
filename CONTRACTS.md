@@ -9,7 +9,9 @@ Source of truth: `backend/contracts.py` (pydantic v2). Frontend mirror: `fronten
 ### `Claim`
 One marketing claim extracted from an evidence artifact (mock, screenshot, HTML), located (`location`: where in the artifact it appears). Produced by the extractor; consumed by the checker, judge, and UI annotations.
 
-**`claim_type` is a legal-entity taxonomy** (amended 2026-08-29, user-directed — explicit exception to the freeze): each value names the body of law that governs the claim, so rules subscribe by legal category rather than by surface form.
+**`claim_types` is a legal-entity taxonomy** (amended 2026-08-29, user-directed — explicit exception to the freeze): each value names the body of law that governs the claim, so rules subscribe by legal category rather than by surface form.
+
+**Amendment #4** (2026-08-29, user-directed, explicit): `Claim.claim_type` (singular) → `Claim.claim_types: ClaimType[]` (min length 1). One statement = one claim object; a span embodying multiple legal categories lists them all.
 
 | Value | Legal anchor |
 |---|---|
@@ -23,7 +25,7 @@ One marketing claim extracted from an evidence artifact (mock, screenshot, HTML)
 | `government_affiliation` | Reg N 1014.3(n): government affiliation/endorsement implications |
 | `general_udaap_representation` | Residual — FTC Act §5; CFPA §1031: urgency devices, comparative/superlative claims, debt-free/savings claims, and any other representation |
 
-**Extractor convention:** a text span that embodies two legal categories yields **two Claim objects** (e.g. "0% intro APR" → one `promotional_or_introductory` + one `rate_or_apr`). No multi-label claims. `rulebook/claim_types_legal_map.json` is the definition document for this enum, kept 1:1 with it.
+**Extractor convention (multi-label, replaces the former two-objects convention):** emit **one Claim per distinct statement**, listing every legal category it embodies (e.g. "0% intro APR for 15 months" → one claim with `claim_types: [promotional_or_introductory, triggering_term]`). Its `normalized_fields` payload is the **union** of the listed types' payload contracts. `rulebook/claim_types_legal_map.json` is the definition document for this enum, kept 1:1 with it.
 
 ### `Disclosure`
 One disclosure found in an evidence artifact, typed (`disclosure_type`: apr_qualifier, trigger_disclosure, soft_pull, not_guaranteed, opt_out_notice, schumer_box_link, nmls_id, taxes_insurance, state_license, intro_adjacency, other) with `location` and `prominence`. Claims *trigger* required disclosures; the checker verifies presence and placement — which is why extraction must capture disclosures, not just claims.

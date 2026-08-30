@@ -21,8 +21,9 @@ Scoring (per fixtures/README.md semantics):
   whitespace collapse + dash/quote unification (em/en dash -> hyphen, curly ->
   straight quotes) + ellipsis/nbsp cleanup.
 - claim recall  = span-matched expected findings / universe
-- type accuracy = span matches whose best-matching claim carries the expected
-  claim_type / span-matched expected findings
+- type accuracy = span matches whose best-matching claim LISTS the expected
+  claim_type among its claim_types / span-matched expected findings
+  (claims are multi-label per contracts amendment #4 — membership, not equality)
 - On MISSES the report and stdout include every extracted claim text for that
   mock next to the expected text, so mismatch causes (transcription drift vs.
   true extraction miss) are diagnosable at a glance.
@@ -156,11 +157,12 @@ def run_eval(evidence_format: str = "png") -> dict:
             if best is not None:
                 span_hits += 1
                 matched_claim_ids.add(best.id)
-                ok = best.claim_type.value == f["expected_claim_type"]
+                got = [t.value for t in best.claim_types]
+                ok = f["expected_claim_type"] in got  # membership: claims are multi-label
                 type_hits += ok
                 rows.append({"claim_text": f["claim_text"], "matched": True,
                              "expected_type": f["expected_claim_type"],
-                             "got_type": best.claim_type.value, "type_ok": ok})
+                             "got_types": got, "type_ok": ok})
             else:
                 rows.append({"claim_text": f["claim_text"], "matched": False,
                              "expected_type": f["expected_claim_type"],
@@ -189,6 +191,7 @@ def run_eval(evidence_format: str = "png") -> dict:
 
     report = {
         "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5"),
+        "claims_are_multi_label": True,  # amendment #4: expected type scored by MEMBERSHIP in claim_types
         "evidence_format_requested": evidence_format,
         "evidence_formats_used": formats_used,
         "universe_claim_anchored_findings": tot_universe,

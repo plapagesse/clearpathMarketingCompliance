@@ -99,10 +99,16 @@ class _NormalizedField(BaseModel):
 
 
 class _ModelClaim(BaseModel):
-    claim_type: ClaimType
+    claim_types: list[ClaimType] = Field(
+        min_length=1,
+        description="EVERY legal category this statement embodies (multi-label; one claim per distinct statement)",
+    )
     text: str = Field(description="VERBATIM span as rendered in the artifact")
     location: str = Field(description="Where in the artifact, e.g. 'headline', 'badge', 'fine print'")
-    normalized_fields: list[_NormalizedField] = Field(default_factory=list)
+    normalized_fields: list[_NormalizedField] = Field(
+        default_factory=list,
+        description="UNION of the payload contracts of every listed claim type",
+    )
 
 
 class _ModelDisclosure(BaseModel):
@@ -175,7 +181,7 @@ def build_system_prompt(spec: dict) -> str:
         "You read one advertisement artifact and emit EVERY marketing claim and EVERY disclosure in it.",
         "You do NOT judge compliance — you classify and transcribe. Neutral, exhaustive, verbatim.",
         "",
-        "## Claim types (legal-entity taxonomy — assign exactly one per claim)",
+        "## Claim types (legal-entity taxonomy — multi-label: list every category a statement embodies)",
         "",
     ]
     for name, t in spec.items():
@@ -197,10 +203,13 @@ def build_system_prompt(spec: dict) -> str:
         lines.append("")
     lines += [
         "## Conventions",
-        "- A span embodying TWO legal categories yields TWO claim objects (no multi-label).",
+        "- Emit ONE claim per distinct statement; list EVERY legal category it embodies in",
+        "  claim_types (e.g. '0% intro APR for 15 months' -> [promotional_or_introductory,",
+        "  triggering_term]). Never split one statement into multiple claim objects.",
         "- `text` must be the VERBATIM rendered span (entity-decoded), not a paraphrase.",
         "- Extract every claim, compliant or not; the downstream checker decides compliance.",
-        "- Populate normalized_fields per the type's payload contract; keys WITHOUT the '?' suffix;",
+        "- normalized_fields is the UNION of the payload contracts of every listed claim type",
+        "  (each listed type's applicable fields present); keys WITHOUT the '?' suffix;",
         "  values stringified ('true'/'false' for booleans, plain digits for numbers).",
         "",
         "## Disclosure types (assign exactly one per disclosure)",
@@ -259,7 +268,7 @@ def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> Extr
     claims = [
         ExtractedClaim(
             id=f"clm-{ctx.evidence_id}-{i:03d}",
-            claim_type=c.claim_type,
+            claim_types=c.claim_types,
             text=c.text,
             location=c.location,
             source_evidence_id=ctx.evidence_id,

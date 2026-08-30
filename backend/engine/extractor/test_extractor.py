@@ -51,14 +51,15 @@ def test_prompt_includes_spec_and_disclosure_enum():
     # a known definition fragment and a near-miss negative made it in verbatim
     assert spec["triggering_term"]["definition"][:60] in prompt
     assert "NEGATIVE" in prompt
-    assert "TWO claim objects" in prompt  # two-categories convention
+    assert "ONE claim per distinct statement" in prompt  # multi-label convention (amendment #4)
+    assert "UNION" in prompt
 
 
 def _fake_raw():
     return ex._ModelExtraction(
         claims=[
             ex._ModelClaim(
-                claim_type=ClaimType.RATE_OR_APR,
+                claim_types=[ClaimType.RATE_OR_APR],
                 text="APR as low as 8.99%",
                 location="body",
                 normalized_fields=[
@@ -85,6 +86,7 @@ def test_mocked_response_roundtrips_into_contracts(monkeypatch):
     result = ex.extract(FIXTURES / "mock_pl_card_compliant.html", ctx, client=object())
     assert isinstance(result.claims[0], Claim)  # subclass is a valid contract Claim
     assert result.claims[0].id == "clm-t1-000"
+    assert result.claims[0].claim_types == [ClaimType.RATE_OR_APR]
     assert result.claims[0].source_evidence_id == "t1"
     assert result.claims[0].normalized_fields == {"value_pct": 8.99, "is_floor_claim": True, "rate_kind": "apr"}
     assert isinstance(result.disclosures[0], Disclosure)
@@ -184,3 +186,38 @@ def test_eval_png_dry_run_to_api_boundary(tmp_path, monkeypatch):
     # with a canned single-claim response, misses must carry diagnostics
     miss_rows = [r for m in report["per_mock"] for r in m["detail"] if not r["matched"]]
     assert all("extracted_texts" in r for r in miss_rows)
+
+
+def test_multilabel_claim_with_union_payload(monkeypatch):
+    """Amendment #4: '0% intro APR for 15 months' is ONE claim carrying both
+    promotional_or_introductory and triggering_term, with the union of both
+    payload contracts."""
+    raw = ex._ModelExtraction(
+        claims=[
+            ex._ModelClaim(
+                claim_types=[ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM],
+                text="0% intro APR for 15 months",
+                location="headline",
+                normalized_fields=[
+                    # promotional_or_introductory payload
+                    ex._NormalizedField(key="promo_rate_pct", value="0"),
+                    ex._NormalizedField(key="promo_period_months", value="15"),
+                    ex._NormalizedField(key="has_intro_word", value="true"),
+                    ex._NormalizedField(key="is_deferred_interest", value="false"),
+                    ex._NormalizedField(key="post_promo_rate_stated", value="false"),
+                    # triggering_term payload (union)
+                    ex._NormalizedField(key="term_months", value="15"),
+                ],
+            )
+        ],
+        disclosures=[],
+    )
+    monkeypatch.setattr(ex, "_call_model", lambda client, system, blocks, model: raw)
+    ctx = ex.ExtractionContext(product=Product.CREDIT_CARD, evidence_id="ml")
+    result = ex.extract("<div>0% intro APR for 15 months</div>", ctx, client=object())
+    c = result.claims[0]
+    assert isinstance(c, Claim)  # validates against the amended contract
+    assert set(c.claim_types) == {ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM}
+    assert c.normalized_fields["promo_rate_pct"] == 0
+    assert c.normalized_fields["has_intro_word"] is True
+    assert c.normalized_fields["term_months"] == 15  # union payload survives

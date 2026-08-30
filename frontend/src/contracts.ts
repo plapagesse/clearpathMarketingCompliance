@@ -7,8 +7,8 @@ export type Product = 'personal_loan' | 'credit_card' | 'mortgage_prequal'
 
 /**
  * Legal-entity taxonomy: each value names the body of law governing the claim.
- * A text span embodying two legal categories yields two Claim objects
- * (extractor convention — no multi-label claims). See CONTRACTS.md.
+ * Claims are MULTI-LABEL (amendment #4): one statement = one Claim object,
+ * listing every legal category it embodies. See CONTRACTS.md.
  */
 export type ClaimType =
   | 'triggering_term' // Reg Z 1026.24(d) / 1026.16(b)
@@ -43,7 +43,8 @@ export type BadgeDesignation = 'prequalified' | 'pre-approved'
 
 export interface Claim {
   id: string
-  claim_type: ClaimType
+  /** Every legal category this statement embodies (amendment #4; min length 1) */
+  claim_types: ClaimType[]
   text: string
   location: string
   source_evidence_id: string
