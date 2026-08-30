@@ -28,6 +28,22 @@ RETRY = payload keys, types, requiredness, vocabularies
 Empty/whitespace value strings mean "no value" and are dropped in finalize —
 '' can never reach a payload.
 
+Artifact text (why it rides along in the SAME call): the checker's token-bound
+rules — "is the word 'intro' printed beside this promotional rate?", "does the
+APR label sit within a line of the figure?" — decide on the creative's text in
+READING ORDER. Given only typed claims and disclosures they fall back to a
+concatenation of those fragments, where the distance between two spans is an
+artefact of concatenation order rather than of the layout, and Reg Z proximity
+findings become noise. Re-reading the screenshot in a second call to get that
+text would double the cost and latency of every submission and could disagree
+with the first read; the model has already read the pixels once, so the
+transcription is one additional FLAT STRING field on the same structured
+output. One string costs nothing against the compiled-grammar cap that the
+layered payload encoding above exists to respect — the cap bit on ~36 optional
+typed fields, not on scalars — so the schema stays inside the envelope that
+was empirically established. It is emitted FIRST so the model transcribes
+before it classifies, which also grounds the verbatim `text` spans below.
+
 Text fidelity note: the literal `text` of claims and disclosures is bounded by
 the vision model's transcription — dashes, quote glyphs, and spacing may
 differ from source text. Downstream matching must use a transcription-tolerant
@@ -79,6 +95,11 @@ class ExtractionResult(BaseModel):
     evidence_id: str
     claims: list[Claim]
     disclosures: list[Disclosure]
+    # The creative's full text in reading order — what the checker's token-bound
+    # rules need to judge proximity and prominence. Empty string when the model
+    # returned nothing; callers pass `artifact_text or None` so run_checks can
+    # tell "no text" from "empty text".
+    artifact_text: str = ""
     model: str
     usage: dict = Field(default_factory=dict)  # input/output token counts
 
@@ -144,6 +165,15 @@ class _ModelDisclosure(BaseModel):
 
 
 class _ModelExtraction(BaseModel):
+    # Listed FIRST so it is generated first: the model transcribes the creative
+    # before it classifies, which grounds the verbatim spans that follow.
+    artifact_text: str = Field(
+        default="",
+        description=(
+            "The COMPLETE text of the artifact transcribed in reading order — headline, body, "
+            "badges, buttons, footnotes and fine print — as one plain-text string"
+        ),
+    )
     claims: list[_ModelClaim]
     disclosures: list[_ModelDisclosure]
 
@@ -208,6 +238,16 @@ def build_system_prompt(spec: dict) -> str:
         "You read one advertisement artifact and emit EVERY marketing claim and EVERY disclosure in it.",
         "You do NOT judge compliance — you classify and transcribe. Neutral, exhaustive, verbatim.",
         "",
+        "## artifact_text (do this FIRST)",
+        "- Transcribe the COMPLETE text of the artifact in READING ORDER, as one plain-text",
+        "  string: headline, badges, body copy, table cells, button labels, footnotes, and every",
+        "  line of fine print, including anything below the fold.",
+        "- Reading order matters more than anything else here: downstream checks decide whether",
+        "  a required phrase is printed NEXT TO the figure it qualifies, so keep the text in the",
+        "  order and adjacency a reader encounters it. Separate visually distinct blocks with a",
+        "  space or newline; never reorder, summarize, deduplicate, or omit fine print.",
+        "- Transcribe only what is legible; never invent text you cannot read.",
+        "",
         "## Claim types (legal-entity taxonomy — multi-label: list every category a statement embodies)",
         "",
     ]
@@ -245,6 +285,10 @@ def build_system_prompt(spec: dict) -> str:
         "  type is listed and must NEVER be omitted — emit them even when the answer is",
         "  'false' or '0'. When a field has NO value, OMIT the pair entirely — never emit",
         "  an empty string.",
+        "- amount_value is a DOLLAR amount only. A fee stated as a percentage ('a 4%",
+        "  origination fee', 'a 3% balance transfer fee') has NO amount_value — set fee_type",
+        "  and omit amount_value. Putting a percentage there makes it read as a dollar figure",
+        "  downstream (a 4% fee becomes a $4 loan).",
         "- Enum-valued fields (use EXACTLY one of the allowed values):",
     ] + [
         f"  - {name}: one of {' | '.join(vals)}"
@@ -257,6 +301,18 @@ def build_system_prompt(spec: dict) -> str:
         "   soft_pull: 'won't affect your credit score'; not_guaranteed: approval-not-guaranteed qualifier;",
         "   opt_out_notice: FCRA prescreen notice; nmls_id: NMLS number; taxes_insurance: payment excludes T&I;",
         "   intro_adjacency: the word 'intro' adjacent to a promo rate; use 'other' only as a last resort.)",
+        "- Type a disclosure by its LEGAL FUNCTION — what it does for the reader — not by where",
+        "  it sits or which nearby claim it follows. In particular: terms that appear because a",
+        "  rate or fee was advertised (the post-introductory APR or APR range, the statement that",
+        "  the rate is variable or tied to the Prime Rate, the annual/balance-transfer/origination",
+        "  fee, the number of payments or repayment period) are 'trigger_disclosure' — that is",
+        "  their function even when they sit inside the same sentence as an intro-rate mention or",
+        "  a creditworthiness caveat. Reserve 'apr_qualifier' for who-qualifies caveats on the",
+        "  advertised rate ('lowest rate requires excellent credit'), 'intro_adjacency' for the",
+        "  literal word 'intro'/'introductory' printed beside the promotional rate, and",
+        "  'schumer_box_link' for a link to the card's rates, fees and terms.",
+        "- When one sentence performs two functions, emit it as two disclosures, one per function,",
+        "  each transcribing the part that performs it.",
         "- Report EVERY disclosure present with its location and an honest prominence assessment.",
         "  Judge prominence VISUALLY: relative text size versus the dominant text, position in the",
         "  layout (top/bottom, above/below the fold line), and contrast against the background —",
@@ -327,6 +383,7 @@ def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> Extr
         evidence_id=ctx.evidence_id,
         claims=claims,
         disclosures=disclosures,
+        artifact_text=(raw.artifact_text or "").strip(),
         model=model,
         usage=raw.__dict__.get("_usage", {}),
     )
@@ -369,7 +426,8 @@ def extract(evidence: str | Path, context: ExtractionContext, client=None) -> Ex
             "text": (
                 f"Context: product={context.product.value}, surface={context.surface or 'unknown'}, "
                 f"partner={context.partner or 'unknown'}. "
-                "Extract all claims and disclosures from the screenshot now."
+                "Transcribe the screenshot's full text in reading order, then extract all "
+                "claims and disclosures from it now."
             ),
         }
     ]

@@ -95,6 +95,15 @@ def test_prompt_includes_spec_and_disclosure_enum():
     assert "must NEVER be omitted" in prompt  # required-fields discipline for weaker models
     assert "VISUALLY" in prompt  # image-only prominence instruction
     assert "HTML" not in prompt
+    # Full-text transcription: the checker's layout rules decide on reading
+    # order, so the prompt must ask for it and must ask for it FIRST.
+    assert "READING ORDER" in prompt
+    assert prompt.index("## artifact_text") < prompt.index("## Claim types")
+    # Disclosure typing by legal function (companion terms after a rate/fee
+    # trigger are trigger_disclosure however they are worded).
+    assert "LEGAL FUNCTION" in prompt
+    # amount_value is dollars, never a percentage (a 4% fee is not a $4 loan).
+    assert "amount_value is a DOLLAR amount only" in prompt
 
 
 # --------------------------------------------------------------------------- #
@@ -104,6 +113,7 @@ def test_prompt_includes_spec_and_disclosure_enum():
 
 def _fake_raw():
     return ex._ModelExtraction(
+        artifact_text="ClearPath Financial. APR as low as 8.99%. Lowest APR requires excellent credit.",
         claims=[
             ex._ModelClaim(
                 claim_types=[ClaimType.RATE_OR_APR],
@@ -139,6 +149,22 @@ def test_mocked_response_roundtrips_into_contracts(monkeypatch, png):
     assert result.claims[0].normalized_fields == {"value_pct": 8.99, "is_floor_claim": True, "labeled_as_apr": True, "rate_kind": "apr"}
     assert isinstance(result.disclosures[0], Disclosure)
     assert result.disclosures[0].prominence == "fine_print"
+    # The creative's full text rides on the SAME call, so run_checks never has
+    # to measure proximity across a concatenation of fragments.
+    assert result.artifact_text.startswith("ClearPath Financial.")
+    assert "Lowest APR requires excellent credit." in result.artifact_text
+
+
+def test_artifact_text_defaults_to_empty_when_the_model_omits_it(monkeypatch, png):
+    """A model that returns no transcription must not fabricate one: the caller
+    passes `artifact_text or None`, and run_checks then degrades explicitly
+    (demoting proximity findings) rather than trusting an empty string."""
+    raw = _fake_raw()
+    raw.artifact_text = "   "
+    monkeypatch.setattr(ex, "_call_model", lambda client, system, blocks, model: raw)
+    ctx = ex.ExtractionContext(product=Product.PERSONAL_LOAN, evidence_id="t2")
+    result = ex.extract(png, ctx, client=object())
+    assert result.artifact_text == ""
 
 
 def test_multilabel_claim_with_union_payload(monkeypatch, png):
