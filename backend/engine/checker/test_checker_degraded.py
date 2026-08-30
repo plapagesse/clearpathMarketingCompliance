@@ -43,6 +43,39 @@ def test_missing_artifact_text_emits_info_coverage_finding(rulebook, real_cells)
     ]
 
 
+def test_coverage_marker_says_what_happened_in_plain_english(rulebook, real_cells):
+    """The marker is what a reviewer sees when a run degraded, so it has to say
+    what was and was not checked — not name the engine's internal planes."""
+    sub = make_submission(offer_ids=["PL-36-A"])
+    result = run(
+        rulebook,
+        submission=sub,
+        cells=[real_cells["PL-36-A"]],
+        claims=[guaranteed_claim()],
+        artifact_text=None,
+    )
+    f = coverage_markers(result)[0]
+    assert f.summary == (
+        "Layout and spacing checks ran on extracted text only for this run; "
+        "proximity results may be incomplete"
+    )
+    for jargon in ("text_plane", "text-plane", "claim_plane", "artifact text", "Token-bound"):
+        assert jargon not in f.summary and jargon not in f.explanation
+
+
+def test_empty_artifact_text_degrades_like_a_missing_one(rulebook, real_cells):
+    """A model that returns a blank transcription must not read as coverage."""
+    sub = make_submission(offer_ids=["PL-36-A"])
+    result = run(
+        rulebook,
+        submission=sub,
+        cells=[real_cells["PL-36-A"]],
+        claims=[guaranteed_claim()],
+        artifact_text="   ",
+    )
+    assert coverage_markers(result)
+
+
 def test_claim_plane_rules_still_decide_without_artifact_text(rulebook, real_cells):
     # Degraded scan runs over claim/disclosure texts; the claim-plane
     # decision for a prohibited phrase needs no raw artifact at all.

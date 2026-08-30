@@ -30,6 +30,14 @@ import pytest
 
 from backend.contracts import CheckClass, ClaimType, DisclosureType, SubmissionMode
 from backend.engine.checker import run_checks
+from backend.engine.checker.engine import DISCLOSURE_LABELS
+
+# Findings are written for compliance officers, so a dropped disclosure is
+# named the way a reviewer says it out loud, not by its enum value. The
+# invariant under test is unchanged — the finding must identify WHICH
+# disclosure moved — so the assertions match the engine's own label table
+# rather than a hardcoded phrase that would drift from it.
+NOT_GUARANTEED_LABEL = DISCLOSURE_LABELS[DisclosureType.NOT_GUARANTEED]
 
 from conftest import (
     OFFER_MATRIX_VERSION,
@@ -196,7 +204,7 @@ def test_dropped_disclosure_emits_one_fidelity_finding(capture_run, baseline_dis
     assert len(fid) == 1, [(f.rule_id, f.summary) for f in fid]
     f = fid[0]
     assert f.rule_id is None
-    assert DisclosureType.NOT_GUARANTEED.value in f.summary, f.summary
+    assert NOT_GUARANTEED_LABEL in f.summary, f.summary
     # ...and nothing about the rate, which did not move
     assert "8.99" not in f.summary, f.summary
 
@@ -216,7 +224,7 @@ def test_both_perturbations_emit_both_fidelity_findings(capture_run, baseline_di
     assert all(f.rule_id is None for f in fid), fid
     summaries = " | ".join(f.summary for f in fid)
     assert "7.99" in summaries
-    assert DisclosureType.NOT_GUARANTEED.value in summaries
+    assert NOT_GUARANTEED_LABEL in summaries
 
 
 def test_drifted_values_still_hit_deterministic_rules(capture_run, baseline_disclosures):
