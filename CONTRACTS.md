@@ -1,6 +1,8 @@
 # Data Contracts
 
-Source of truth: `backend/contracts.py` (pydantic v2). Frontend mirror: `frontend/src/contracts.ts` (kept in sync by hand).
+Source of truth: `backend/contracts.py` (pydantic v2). The TypeScript side is **generated, never hand-edited**: `frontend/src/contracts.gen.ts` is emitted by `scripts/generate_contracts_ts.py` (enums → string-literal unions, models → interfaces, claim-type payload interfaces derived transitively from `rulebook/claim_types_legal_map.json`).
+
+**Workflow: edit `backend/contracts.py` (or the legal map for payload fields) → run `python scripts/generate_contracts_ts.py` → commit both.** Freshness is enforced by `python scripts/generate_contracts_ts.py --check` (wired into `smoke.sh`) and by `backend/test_contracts_codegen.py`.
 
 **FREEZE RULE:** these models are frozen after Stage 1. Any PR that changes a contract must call the change out explicitly in its description, and update both files together. All other PRs build against these shapes as-is.
 
