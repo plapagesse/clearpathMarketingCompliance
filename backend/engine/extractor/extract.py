@@ -32,12 +32,12 @@ from __future__ import annotations
 import base64
 import json
 import os
-import re
 from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.contracts import (
+    CLAIM_TYPE_PAYLOADS,
     Claim,
     ClaimType,
     Disclosure,
@@ -81,15 +81,38 @@ class ExtractionContext(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
-# Model-facing output schema (no ids — ids are assigned deterministically here;
-# normalized fields travel as key/value string pairs because strict structured
-# outputs reject open-ended dicts)
+# Model-facing output schema (no ids — ids are assigned deterministically here).
+#
+# normalized_fields is a TYPED CLOSED OBJECT: the union of all 9 contract
+# payload models' fields, every field Optional, enums as Literal, extras
+# forbidden. Built programmatically from CLAIM_TYPE_PAYLOADS so it cannot
+# drift from the contracts; constrained decoding then enforces types and
+# vocabularies at generation time (no empty-string floats, no off-vocabulary
+# strings, phantom keys impossible). Per-type requiredness is validated
+# after finalize by validate_claim_payload().
 # --------------------------------------------------------------------------- #
 
 
-class _NormalizedField(BaseModel):
-    key: str
-    value: str = Field(description="Stringified value: 'true'/'false' for booleans, plain digits for numbers")
+def _build_union_payload_model() -> type[BaseModel]:
+    from typing import Optional
+
+    from pydantic import ConfigDict, create_model
+
+    fields: dict = {}
+    for payload_model in CLAIM_TYPE_PAYLOADS.values():
+        for name, info in payload_model.model_fields.items():
+            ann = Optional[info.annotation]
+            if name in fields and fields[name][0] != ann:
+                raise TypeError(
+                    f"payload field collision with conflicting types: {name!r}"
+                )
+            fields[name] = (ann, None)
+    return create_model(
+        "_UnionPayload", __config__=ConfigDict(extra="forbid"), **fields
+    )
+
+
+_UnionPayload = _build_union_payload_model()
 
 
 class _ModelClaim(BaseModel):
@@ -99,9 +122,12 @@ class _ModelClaim(BaseModel):
     )
     text: str = Field(description="VERBATIM span as rendered in the artifact")
     location: str = Field(description="Where in the artifact, e.g. 'headline', 'badge', 'fine print'")
-    normalized_fields: list[_NormalizedField] = Field(
-        default_factory=list,
-        description="UNION of the payload contracts of every listed claim type",
+    normalized_fields: _UnionPayload = Field(  # type: ignore[valid-type]
+        default_factory=_UnionPayload,
+        description=(
+            "Typed payload object — set the fields belonging to the listed claim types; "
+            "leave every inapplicable field null"
+        ),
     )
 
 
@@ -194,11 +220,11 @@ def build_system_prompt(spec: dict) -> str:
         "- Extract every claim, compliant or not; the downstream checker decides compliance.",
         "- Statements about availability, eligibility, or geography (states served, who",
         "  qualifies) ARE claims — always extract them.",
-        "- normalized_fields is the UNION of the payload contracts of every listed claim type.",
-        "  Fields WITHOUT the '?' suffix are REQUIRED whenever their claim type is listed and",
-        "  must NEVER be omitted — emit them even when the answer is 'false' or '0'. Only",
-        "  '?'-suffixed fields may be skipped when inapplicable. Values stringified",
-        "  ('true'/'false' for booleans, plain digits for numbers).",
+        "- normalized_fields is a TYPED OBJECT covering the union of every claim type's",
+        "  payload contract. Set the fields belonging to this claim's listed types; fields",
+        "  WITHOUT the '?' suffix are REQUIRED whenever their claim type is listed and",
+        "  must NEVER be omitted — emit them even when the answer is false or 0. Leave every",
+        "  inapplicable field null; never use empty strings for missing values.",
         "",
         "## Disclosure types (assign exactly one per disclosure)",
         "- " + ", ".join(d.value for d in DisclosureType),
@@ -240,16 +266,6 @@ def _call_model(client, system: str, content_blocks: list[dict], model: str) -> 
     return out
 
 
-def _coerce(value: str):
-    v = value.strip()
-    if v.lower() in {"true", "false"}:
-        return v.lower() == "true"
-    try:
-        return int(v) if re.fullmatch(r"-?\d+", v) else float(v)
-    except ValueError:
-        return v
-
-
 def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> ExtractionResult:
     claims = [
         Claim(
@@ -258,7 +274,7 @@ def _finalize(raw: _ModelExtraction, ctx: ExtractionContext, model: str) -> Extr
             text=c.text,
             location=c.location,
             source_evidence_id=ctx.evidence_id,
-            normalized_fields={nf.key: _coerce(nf.value) for nf in c.normalized_fields},
+            normalized_fields={k: v for k, v in c.normalized_fields.model_dump().items() if v is not None},
         )
         for i, c in enumerate(raw.claims)
     ]

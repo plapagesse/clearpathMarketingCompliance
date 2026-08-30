@@ -90,7 +90,7 @@ def test_prompt_includes_spec_and_disclosure_enum():
     assert spec["triggering_term"]["definition"][:60] in prompt
     assert "NEGATIVE" in prompt
     assert "ONE claim per distinct statement" in prompt  # multi-label convention (amendment #4)
-    assert "UNION" in prompt
+    assert "TYPED OBJECT" in prompt  # union payload is a typed closed object now
     assert "must NEVER be omitted" in prompt  # required-fields discipline for weaker models
     assert "VISUALLY" in prompt  # image-only prominence instruction
     assert "HTML" not in prompt
@@ -108,12 +108,8 @@ def _fake_raw():
                 claim_types=[ClaimType.RATE_OR_APR],
                 text="APR as low as 8.99%",
                 location="body",
-                normalized_fields=[
-                    ex._NormalizedField(key="value_pct", value="8.99"),
-                    ex._NormalizedField(key="is_floor_claim", value="true"),
-                    ex._NormalizedField(key="labeled_as_apr", value="true"),
-                    ex._NormalizedField(key="rate_kind", value="apr"),
-                ],
+                normalized_fields={"value_pct": 8.99, "is_floor_claim": True,
+                                   "labeled_as_apr": True, "rate_kind": "apr"},
             )
         ],
         disclosures=[
@@ -149,14 +145,9 @@ def test_multilabel_claim_with_union_payload(monkeypatch, png):
                 claim_types=[ClaimType.PROMOTIONAL_OR_INTRODUCTORY, ClaimType.TRIGGERING_TERM],
                 text="0% intro APR for 15 months",
                 location="headline",
-                normalized_fields=[
-                    ex._NormalizedField(key="promo_rate_pct", value="0"),
-                    ex._NormalizedField(key="promo_period_months", value="15"),
-                    ex._NormalizedField(key="has_intro_word", value="true"),
-                    ex._NormalizedField(key="is_deferred_interest", value="false"),
-                    ex._NormalizedField(key="post_promo_rate_stated", value="false"),
-                    ex._NormalizedField(key="term_months", value="15"),
-                ],
+                normalized_fields={"promo_rate_pct": 0, "promo_period_months": 15,
+                                   "has_intro_word": True, "is_deferred_interest": False,
+                                   "post_promo_rate_stated": False, "term_months": 15},
             )
         ],
         disclosures=[],
@@ -333,7 +324,7 @@ def test_invalid_payload_joins_retry_path(monkeypatch, png):
         calls["n"] += 1
         if calls["n"] == 1:
             bad = _fake_raw()
-            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
+            bad.claims[0].normalized_fields.rate_kind = None  # drop a required field
             return bad
         return _fake_raw()
 
@@ -403,7 +394,7 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
         seen_blocks.append(blocks)
         if len(seen_blocks) == 1:
             bad = _fake_raw()
-            bad.claims[0].normalized_fields.append(ex._NormalizedField(key="bogus_key", value="1"))
+            bad.claims[0].normalized_fields.rate_kind = None  # drop a required field
             return bad
         return _fake_raw()
 
@@ -415,5 +406,81 @@ def test_corrective_retry_includes_failure_text(monkeypatch, png):
     texts2 = [b.get("text", "") for b in seen_blocks[1] if b.get("type") == "text"]
     assert not any("failed validation" in t for t in texts1)
     corrective = [t for t in texts2 if "failed validation" in t]
-    assert corrective and "bogus_key" in corrective[0]
+    assert corrective and "rate_kind" in corrective[0]
     assert "Re-emit the complete corrected extraction" in corrective[0]
+
+
+# --------------------------------------------------------------------------- #
+# Decode-enforced payload schema (typed union object)
+# --------------------------------------------------------------------------- #
+
+
+def test_union_model_covers_payload_models_exactly():
+    """Drift discipline: _UnionPayload's fields+types must exactly cover the
+    union of the 9 contract payload models (every field Optional[payload type])."""
+    from typing import Optional
+
+    expected: dict = {}
+    for model in CLAIM_TYPE_PAYLOADS.values():
+        for name, info in model.model_fields.items():
+            ann = Optional[info.annotation]
+            assert expected.get(name, ann) == ann, f"conflicting types for {name}"
+            expected[name] = ann
+    assert set(ex._UnionPayload.model_fields) == set(expected)
+    for name, ann in expected.items():
+        assert Optional[ex._UnionPayload.model_fields[name].annotation] == ann, name
+    # closed object: extras forbidden -> phantom keys impossible at decode time
+    with pytest.raises(ValidationError):
+        ex._UnionPayload(bogus_key=1)
+
+
+def test_union_model_rejects_empty_string_for_float():
+    """The Haiku failure mode: '' for an optional float must be rejected at the
+    schema layer, never reach a payload."""
+    with pytest.raises(ValidationError):
+        ex._UnionPayload(odds_value_pct="")
+    with pytest.raises(ValidationError):
+        ex._ModelClaim(claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
+                       text="x", location="y",
+                       normalized_fields={"odds_value_pct": ""})
+    # None and absent are both fine and both drop out in finalize
+    c = ex._ModelClaim(claim_types=[ClaimType.APPROVAL_OR_PREQUALIFICATION],
+                       text="x", location="y",
+                       normalized_fields={"badge_word": "prequalified", "strength": "prequalified",
+                                          "odds_value_pct": None})
+    dumped = {k: v for k, v in c.normalized_fields.model_dump().items() if v is not None}
+    assert "odds_value_pct" not in dumped and dumped["badge_word"] == "prequalified"
+
+
+def test_spec_prose_never_references_undeclared_fields():
+    """Prose lint: any snake_case field-shaped token in a type's definition or
+    normalized_fields descriptions must be a declared field of that type, a
+    Literal vocabulary value of its payload model, or on the explicit allowlist.
+    Makes the phantom-flag class of drift structurally impossible to reintroduce."""
+    import re as _re
+    import typing
+
+    ALLOWLIST = {
+        "claim_types", "normalized_fields", "claim_type",
+        "not_conflated",  # rulebook comparator name, not a payload field
+    }
+    token_re = _re.compile(r"\b[a-z]+(?:_[a-z]+)+\b")
+    spec = ex.load_classification_spec()
+    offenders = []
+    for ct in ClaimType:
+        t = spec[ct.value]
+        model = CLAIM_TYPE_PAYLOADS[ct]
+        allowed = {k.rstrip("?") for k in t["normalized_fields"]} | ALLOWLIST
+        allowed |= {c.value for c in ClaimType}  # cross-references to sibling types are legitimate
+        for info in model.model_fields.values():
+            for arg in typing.get_args(info.annotation):
+                for lit in typing.get_args(arg) or ([arg] if isinstance(arg, str) else []):
+                    if isinstance(lit, str):
+                        allowed.add(lit)
+        prose = [("definition", t["definition"])]
+        prose += [(f"normalized_fields.{k}", v) for k, v in t["normalized_fields"].items()]
+        for where, text in prose:
+            for tok in token_re.findall(text):
+                if tok not in allowed:
+                    offenders.append(f"{ct.value}.{where}: {tok!r}")
+    assert not offenders, "prose references undeclared fields:\n" + "\n".join(offenders)
