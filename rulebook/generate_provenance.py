@@ -121,9 +121,11 @@ def generate() -> str:
     out.append("")
     out.append("## Map")
     out.append("")
+    out.append("### Overview")
+    out.append("")
     out.append("```mermaid")
     out.append("flowchart LR")
-    out.append(f'    LAW["US consumer-credit advertising law"]')
+    out.append('    LAW["US consumer-credit advertising law"]')
     for key, name in FAMILIES:
         count = len(per_family_rules[key])
         out.append(f'    LAW --> {key}["{name} — {count} rules"]')
@@ -133,6 +135,51 @@ def generate() -> str:
             if n:
                 out.append(f'    {key} --> {key}_{product}["{product} ({n})"]')
     out.append("```")
+    out.append("")
+    out.append("### Full trace")
+    out.append("")
+    out.append("Every rule as a leaf under its primary family's product cluster; dashed edges mark")
+    out.append("cross-family secondary anchors (multi-authority rules).")
+    out.append("")
+
+    def leaf_id(rid: str) -> str:
+        return "r_" + rid.replace("-", "_")
+
+    out.append("```mermaid")
+    out.append("flowchart LR")
+    out.append('    LAW["US consumer-credit advertising law"]')
+    for key, name in FAMILIES:
+        count = len(per_family_rules[key])
+        out.append(f'    LAW --> {key}["{name} — {count} rules"]')
+    class_members: dict[str, list[str]] = {"detToken": [], "detConcept": [], "judged": []}
+    for key, _name in FAMILIES:
+        for product in PRODUCTS:
+            n = per_family_product[key].get(product, 0)
+            if n:
+                out.append(f'    {key} --> {key}_{product}["{product} ({n})"]')
+        for rule in per_family_rules[key]:
+            rid = rule["rule_id"]
+            lid = leaf_id(rid)
+            out.append(f'    {key}_{rule["product"]} --> {lid}["{rid}"]')
+            if rule["check_kind"] == "llm_judged":
+                class_members["judged"].append(lid)
+            elif rule["parameters"].get("binding") == "token":
+                class_members["detToken"].append(lid)
+            else:
+                class_members["detConcept"].append(lid)
+    for rid, secs in secondary_families.items():
+        for fam2, _cite in secs:
+            out.append(f"    {fam2} -.-> {leaf_id(rid)}")
+    out.append("    classDef detToken fill:#2e6e4e,stroke:#1e4e36,color:#f2f2f2")
+    out.append("    classDef detConcept fill:#39588c,stroke:#27406a,color:#f2f2f2")
+    out.append("    classDef judged fill:#6d4f8c,stroke:#503a6b,color:#f2f2f2")
+    for cls, members in class_members.items():
+        for i in range(0, len(members), 10):
+            out.append(f"    class {','.join(members[i:i + 10])} {cls}")
+    out.append("```")
+    out.append("")
+    out.append("*Legend: green = deterministic (token-bound), blue = deterministic (concept-bound),")
+    out.append("purple = LLM-judged. Solid edges = primary authority; dashed = secondary anchor.*")
     out.append("")
 
     for key, name in FAMILIES:

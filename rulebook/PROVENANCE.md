@@ -7,6 +7,8 @@ is **generated** by `rulebook/generate_provenance.py` — do not hand-edit (see 
 
 ## Map
 
+### Overview
+
 ```mermaid
 flowchart LR
     LAW["US consumer-credit advertising law"]
@@ -31,6 +33,116 @@ flowchart LR
     state --> state_personal_loan["personal_loan (1)"]
     state --> state_mortgage_prequal["mortgage_prequal (1)"]
 ```
+
+### Full trace
+
+Every rule as a leaf under its primary family's product cluster; dashed edges mark
+cross-family secondary anchors (multi-authority rules).
+
+```mermaid
+flowchart LR
+    LAW["US consumer-credit advertising law"]
+    LAW --> regz["TILA / Regulation Z — 17 rules"]
+    LAW --> regn["Regulation N (MAP Rule) — 7 rules"]
+    LAW --> udaap["FTC Act §5 / CFPA UDAAP deception floor — 19 rules"]
+    LAW --> fcra["FCRA (Fair Credit Reporting Act) — 3 rules"]
+    LAW --> endorse["FTC Endorsement Guides — 3 rules"]
+    LAW --> state["State & licensing law (incl. SAFE Act) — 2 rules"]
+    regz --> regz_personal_loan["personal_loan (5)"]
+    regz --> regz_credit_card["credit_card (7)"]
+    regz --> regz_mortgage_prequal["mortgage_prequal (5)"]
+    regz_personal_loan --> r_PL_TRIG_001["PL-TRIG-001"]
+    regz_personal_loan --> r_PL_APR_001["PL-APR-001"]
+    regz_personal_loan --> r_PL_APR_002["PL-APR-002"]
+    regz_personal_loan --> r_PL_TRUTH_001["PL-TRUTH-001"]
+    regz_personal_loan --> r_PL_JUDGE_002["PL-JUDGE-002"]
+    regz_credit_card --> r_CC_TRIG_001["CC-TRIG-001"]
+    regz_credit_card --> r_CC_INTRO_001["CC-INTRO-001"]
+    regz_credit_card --> r_CC_INTRO_002["CC-INTRO-002"]
+    regz_credit_card --> r_CC_DEFER_001["CC-DEFER-001"]
+    regz_credit_card --> r_CC_FIXED_001["CC-FIXED-001"]
+    regz_credit_card --> r_CC_SCHUMER_001["CC-SCHUMER-001"]
+    regz_credit_card --> r_CC_TRUTH_001["CC-TRUTH-001"]
+    regz_mortgage_prequal --> r_MTG_TI_001["MTG-TI-001"]
+    regz_mortgage_prequal --> r_MTG_RATE_001["MTG-RATE-001"]
+    regz_mortgage_prequal --> r_MTG_DEBT_001["MTG-DEBT-001"]
+    regz_mortgage_prequal --> r_MTG_TRUTH_001["MTG-TRUTH-001"]
+    regz_mortgage_prequal --> r_MTG_COUNSEL_001["MTG-COUNSEL-001"]
+    regn --> regn_mortgage_prequal["mortgage_prequal (7)"]
+    regn_mortgage_prequal --> r_MTG_REGN_001["MTG-REGN-001"]
+    regn_mortgage_prequal --> r_MTG_FIXED_001["MTG-FIXED-001"]
+    regn_mortgage_prequal --> r_MTG_GOV_001["MTG-GOV-001"]
+    regn_mortgage_prequal --> r_MTG_JUDGE_001["MTG-JUDGE-001"]
+    regn_mortgage_prequal --> r_XP_PREQ_002_mortgage_prequal["XP-PREQ-002-mortgage_prequal"]
+    regn_mortgage_prequal --> r_XP_COMP_003_mortgage_prequal["XP-COMP-003-mortgage_prequal"]
+    regn_mortgage_prequal --> r_XP_ODDS_005_mortgage_prequal["XP-ODDS-005-mortgage_prequal"]
+    udaap --> udaap_personal_loan["personal_loan (9)"]
+    udaap --> udaap_credit_card["credit_card (7)"]
+    udaap --> udaap_mortgage_prequal["mortgage_prequal (3)"]
+    udaap_personal_loan --> r_PL_STATE_EXCL_001["PL-STATE-EXCL-001"]
+    udaap_personal_loan --> r_PL_FEE_001["PL-FEE-001"]
+    udaap_personal_loan --> r_PL_JUDGE_001["PL-JUDGE-001"]
+    udaap_credit_card --> r_CC_JUDGE_001["CC-JUDGE-001"]
+    udaap_personal_loan --> r_XP_UDAAP_001_personal_loan["XP-UDAAP-001-personal_loan"]
+    udaap_credit_card --> r_XP_UDAAP_001_credit_card["XP-UDAAP-001-credit_card"]
+    udaap_mortgage_prequal --> r_XP_UDAAP_001_mortgage_prequal["XP-UDAAP-001-mortgage_prequal"]
+    udaap_personal_loan --> r_XP_PREQ_002_personal_loan["XP-PREQ-002-personal_loan"]
+    udaap_credit_card --> r_XP_PREQ_002_credit_card["XP-PREQ-002-credit_card"]
+    udaap_personal_loan --> r_XP_COMP_003_personal_loan["XP-COMP-003-personal_loan"]
+    udaap_credit_card --> r_XP_COMP_003_credit_card["XP-COMP-003-credit_card"]
+    udaap_personal_loan --> r_XP_URG_004_personal_loan["XP-URG-004-personal_loan"]
+    udaap_credit_card --> r_XP_URG_004_credit_card["XP-URG-004-credit_card"]
+    udaap_mortgage_prequal --> r_XP_URG_004_mortgage_prequal["XP-URG-004-mortgage_prequal"]
+    udaap_personal_loan --> r_XP_ODDS_005_personal_loan["XP-ODDS-005-personal_loan"]
+    udaap_credit_card --> r_XP_ODDS_005_credit_card["XP-ODDS-005-credit_card"]
+    udaap_personal_loan --> r_XP_SOFT_007_personal_loan["XP-SOFT-007-personal_loan"]
+    udaap_credit_card --> r_XP_SOFT_007_credit_card["XP-SOFT-007-credit_card"]
+    udaap_mortgage_prequal --> r_XP_SOFT_007_mortgage_prequal["XP-SOFT-007-mortgage_prequal"]
+    fcra --> fcra_personal_loan["personal_loan (1)"]
+    fcra --> fcra_credit_card["credit_card (2)"]
+    fcra_personal_loan --> r_PL_BADGE_001["PL-BADGE-001"]
+    fcra_credit_card --> r_CC_PRESCREEN_001["CC-PRESCREEN-001"]
+    fcra_credit_card --> r_CC_BADGE_001["CC-BADGE-001"]
+    endorse --> endorse_personal_loan["personal_loan (1)"]
+    endorse --> endorse_credit_card["credit_card (1)"]
+    endorse --> endorse_mortgage_prequal["mortgage_prequal (1)"]
+    endorse_personal_loan --> r_XP_TEST_006_personal_loan["XP-TEST-006-personal_loan"]
+    endorse_credit_card --> r_XP_TEST_006_credit_card["XP-TEST-006-credit_card"]
+    endorse_mortgage_prequal --> r_XP_TEST_006_mortgage_prequal["XP-TEST-006-mortgage_prequal"]
+    state --> state_personal_loan["personal_loan (1)"]
+    state --> state_mortgage_prequal["mortgage_prequal (1)"]
+    state_personal_loan --> r_PL_STATE_CAP_001["PL-STATE-CAP-001"]
+    state_mortgage_prequal --> r_MTG_NMLS_001["MTG-NMLS-001"]
+    udaap -.-> r_PL_APR_002
+    udaap -.-> r_PL_TRUTH_001
+    udaap -.-> r_PL_BADGE_001
+    udaap -.-> r_PL_JUDGE_002
+    udaap -.-> r_CC_BADGE_001
+    udaap -.-> r_CC_TRUTH_001
+    regz -.-> r_MTG_FIXED_001
+    regn -.-> r_MTG_TI_001
+    regn -.-> r_MTG_DEBT_001
+    udaap -.-> r_MTG_TRUTH_001
+    udaap -.-> r_XP_PREQ_002_mortgage_prequal
+    udaap -.-> r_XP_COMP_003_mortgage_prequal
+    regn -.-> r_XP_URG_004_mortgage_prequal
+    udaap -.-> r_XP_ODDS_005_mortgage_prequal
+    udaap -.-> r_XP_TEST_006_personal_loan
+    udaap -.-> r_XP_TEST_006_credit_card
+    regn -.-> r_XP_TEST_006_mortgage_prequal
+    classDef detToken fill:#2e6e4e,stroke:#1e4e36,color:#f2f2f2
+    classDef detConcept fill:#39588c,stroke:#27406a,color:#f2f2f2
+    classDef judged fill:#6d4f8c,stroke:#503a6b,color:#f2f2f2
+    class r_PL_APR_001,r_CC_INTRO_001,r_CC_INTRO_002,r_CC_DEFER_001,r_CC_FIXED_001,r_MTG_RATE_001,r_MTG_COUNSEL_001,r_MTG_FIXED_001,r_CC_PRESCREEN_001,r_MTG_NMLS_001 detToken
+    class r_PL_TRIG_001,r_PL_APR_002,r_PL_TRUTH_001,r_CC_TRIG_001,r_CC_SCHUMER_001,r_CC_TRUTH_001,r_MTG_TI_001,r_MTG_DEBT_001,r_MTG_TRUTH_001,r_MTG_REGN_001 detConcept
+    class r_MTG_GOV_001,r_XP_PREQ_002_mortgage_prequal,r_PL_STATE_EXCL_001,r_PL_FEE_001,r_XP_UDAAP_001_personal_loan,r_XP_UDAAP_001_credit_card,r_XP_UDAAP_001_mortgage_prequal,r_XP_PREQ_002_personal_loan,r_XP_PREQ_002_credit_card,r_XP_URG_004_personal_loan detConcept
+    class r_XP_URG_004_credit_card,r_XP_URG_004_mortgage_prequal,r_XP_SOFT_007_personal_loan,r_XP_SOFT_007_credit_card,r_XP_SOFT_007_mortgage_prequal,r_PL_BADGE_001,r_CC_BADGE_001,r_PL_STATE_CAP_001 detConcept
+    class r_PL_JUDGE_002,r_MTG_JUDGE_001,r_XP_COMP_003_mortgage_prequal,r_XP_ODDS_005_mortgage_prequal,r_PL_JUDGE_001,r_CC_JUDGE_001,r_XP_COMP_003_personal_loan,r_XP_COMP_003_credit_card,r_XP_ODDS_005_personal_loan,r_XP_ODDS_005_credit_card judged
+    class r_XP_TEST_006_personal_loan,r_XP_TEST_006_credit_card,r_XP_TEST_006_mortgage_prequal judged
+```
+
+*Legend: green = deterministic (token-bound), blue = deterministic (concept-bound),
+purple = LLM-judged. Solid edges = primary authority; dashed = secondary anchor.*
 
 ## TILA / Regulation Z
 
