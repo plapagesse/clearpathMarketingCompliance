@@ -1,6 +1,6 @@
 # Fixtures — evidence set for the ClearPath compliance engine
 
-Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inline CSS), the offer matrix they must be checked against, the submission manifest, and the ground-truth answer key.
+Demo/eval inputs: partner placement mocks (self-contained HTML, inline CSS), the offer matrix they must be checked against, the submission manifest, and the ground-truth answer key. Three partners with deliberately different house styles are represented so the demo shows the engine working across creative, not one template: **credit_karma** (white card, blue button, green "Prequalified" chip), **nerdwallet** (off-white editorial review page, serif headline, star-rating row, green buttons), **lendingtree** (dense lead-gen comparison layout, orange header and CTAs, "5 lenders compete" strip).
 
 - `offer_matrix.csv` — ClearPath's current offer cells (version `2026-08`): the truthfulness baseline for every check.
 - `submissions.csv` — one manifest row per mock (context bundle: product, template, offer cells, states, mode, SLA). Columns match `backend/contracts.py::Submission`, including `baseline_submission_id`: the machine-readable fidelity join key, populated only on verification-mode rows and pointing at the pre_publication submission the capture drifted from (empty everywhere else); `change_summary` keeps the human-readable context.
@@ -12,17 +12,29 @@ Demo/eval inputs: Credit Karma-style placement mocks (self-contained HTML, inlin
 
 ## Inventory
 
-| File | Product | Mode | Compliant? | Planted violations |
-|---|---|---|---|---|
-| `mock_pl_card_compliant.html` | personal_loan | pre_publication | ✅ | — |
-| `mock_pl_card_preapproved_guaranteed.html` | personal_loan | pre_publication | ❌ | "Pre-approved" badge on non-firm offer; "guaranteed approval regardless of credit history"; missing not-a-guarantee qualifier |
-| `mock_pl_card_trigger_stale.html` | personal_loan | pre_publication | ❌ | Payment trigger term ($299/mo) w/o Reg Z companion disclosures; APR floor 7.49% not in offer matrix; thin "as low as" qualifier |
-| `mock_pl_card_il_leak.html` | personal_loan | pre_publication | ❌ | 60-mo cell advertised as available in IL despite matrix exclusion (PLPA 36% cap) |
-| `mock_cc_card_compliant.html` | credit_card | pre_publication | ✅ | — |
-| `mock_cc_card_intro_violations.html` | credit_card | pre_publication | ❌ | "0% APR" without "intro" adjacency; post-promo APR buried in 8px footer; "No annual fee / no interest" net-impression fee claim |
-| `mock_cc_prescreen_email_no_optout.html` | credit_card | pre_publication | ❌ | Legit firm offer but FCRA prescreen opt-out notice (short+long) entirely missing |
-| `mock_mtg_table_compliant.html` | mortgage_prequal | pre_publication | ✅ | — |
-| `mock_mtg_arm_as_fixed.html` | mortgage_prequal | pre_publication | ❌ | 5/6 ARM sold as "fixed"; NMLS ID missing; payment shown w/o taxes-&-insurance qualifier |
-| `seed_screenshot_pl_card_drift.html` | personal_loan | **verification** | ❌ | Drift vs approved `mock_pl_card_compliant.html`: APR floor 8.99→7.99 (also matrix-invalid); entire qualifier fine-print paragraph dropped |
+Verdict mix: **12 clean · 3 issues · 1 review** — the queue a reviewer actually works. *Clean* = empty `expected_findings` (nothing at or above medium should fire). *Issues* = high/critical deterministic findings. *Review* = medium, judgment-class only: nothing deterministic fires and the call belongs to a human.
 
-Notes: every planted violation is literally present (or verifiably absent) in the HTML text and its rendered PNG — `expected_findings.json` has no phantom entries. `submissions.csv` `asset_files` lists `<base>.png;<base>.html` (PNG first = what the platform ingests); `expected_findings.json` stays keyed by the HTML basename — the PNG↔HTML↔key mapping is by basename convention.
+| File | Partner | Product | Mode | Verdict | Expected findings (rule ids) |
+|---|---|---|---|---|---|
+| `mock_pl_card_compliant.html` | credit_karma | personal_loan | pre_publication | clean | — |
+| `mock_pl_card_preapproved_guaranteed.html` | credit_karma | personal_loan | pre_publication | **issues** | "Pre-approved" badge on non-firm offer (`PL-BADGE-001`); "guaranteed approval regardless of credit history" (`XP-UDAAP-001-personal_loan`); missing not-a-guarantee qualifier (`PL-JUDGE-001`) |
+| `mock_pl_card_payment_example.html` | credit_karma | personal_loan | pre_publication | clean | — (payment-first headline done right: the `$299/mo` trigger term carries amount, term, labeled APR, total of payments and the fee baked into the example; floor re-synced to the matrix 8.99%) |
+| `mock_pl_card_states.html` | credit_karma | personal_loan | pre_publication | clean | — (targeting re-synced to PL-60-A `states_excluded`, so the 35.99% top of range never runs under a state cap) |
+| `mock_cc_card_compliant.html` | credit_karma | credit_card | pre_publication | clean | — |
+| `mock_cc_card_net_impression.html` | credit_karma | credit_card | pre_publication | **review** | "No annual fee. No interest. No brainer." — fee net-impression judgment call, medium (`CC-JUDGE-001`). Nothing deterministic: intro adjacency and post-promo proximity are both satisfied on the creative |
+| `mock_cc_prescreen_email.html` | credit_karma | credit_card | pre_publication | clean | — (genuine FCRA firm offer, so "pre-approved" is permitted; short-form and long-form opt-out notices both present) |
+| `mock_mtg_table_compliant.html` | credit_karma | mortgage_prequal | pre_publication | clean | — |
+| `mock_mtg_arm_offer.html` | credit_karma | mortgage_prequal | pre_publication | clean | — (5/6 ARM described as adjustable with margin and caps; NMLS ID displayed; payment carries the taxes-and-insurance qualifier) |
+| `mock_nw_pl_review_compliant.html` | nerdwallet | personal_loan | pre_publication | clean | — |
+| `mock_nw_cc_forever_bt.html` | nerdwallet | credit_card | pre_publication | **issues** | "0% APR forever on balance transfers" — no intro adjacency (`CC-INTRO-001`); "risk-free" (`XP-UDAAP-001-credit_card`). A third planted finding was withdrawn as unreachable — see the `_withdrawn_note` in the key |
+| `mock_nw_pl_fast_decision.html` | nerdwallet | personal_loan | pre_publication | clean | — (approval-certainty copy replaced with the soft-pull rate check the flow actually delivers, plus the approval-not-guaranteed qualifier) |
+| `mock_lt_mtg_compare_compliant.html` | lendingtree | mortgage_prequal | pre_publication | clean | — |
+| `mock_lt_mtg_preapproved_gov.html` | lendingtree | mortgage_prequal | pre_publication | **issues** | "Pre-approved" on mortgage prequal (`MTG-REGN-001`); "government-backed … FHA and VA loan options" (`MTG-GOV-001`); ARM "fixed for the life of the loan" (`MTG-FIXED-001`) |
+| `mock_lt_cc_row_compliant.html` | lendingtree | credit_card | pre_publication | clean | — |
+| `seed_screenshot_pl_card_verified.html` | credit_karma | personal_loan | **verification** | clean | — (production capture matches approved baseline `mock_pl_card_compliant.html`: floor and qualifier fine print intact, so the fidelity diff is empty) |
+
+### Eval integrity — the canary check
+
+A perfect extractor score is only evidence if the eval is capable of reporting a bad one, so the harness is periodically proven falsifiable with a **canary**: a throwaway answer-key entry, plus its rendered mock, that is deliberately wrong in two independent ways — some `claim_text` values that appear nowhere in the creative, and one real span carrying a deliberately wrong `expected_claim_type`. To reproduce: temporarily add such an entry to `expected_findings.json` with a matching `mock_canary.html` + `submissions.csv` row, render it (`python fixtures/render_screenshots.py fixtures/mock_canary.html`), and run `python -m backend.engine.extractor.eval`. The expected result is degraded scores **localized to the canary** and unchanged elsewhere: the fabricated claim_texts are reported as misses (the run that established this scored 1/3 spans) and the mis-typed real span drops type accuracy to 0, with `eval_report.json` naming each miss next to the extracted claims for that mock. A canary that scores clean means the scoring path is broken, not that the extractor is good. **Never commit the canary** — delete the entry, the mock, the manifest row and the PNG once the check is done; `validate_fixtures.py` will fail while any of them is half-removed.
+
+Notes: the three *issues* mocks are written against the rulebook's own phrase sources — `rulebook/data/lexicons.json` and `patterns.json` — so the deterministic checker actually fires on them (that is the point of the demo set); *clean* mocks are correspondingly written to avoid every lexicon/pattern trigger they do not disclose, and the *review* mock avoids all of them while keeping one gray-area net-impression claim for the judge. Every expected finding is literally present (or verifiably absent) in the HTML text and its rendered PNG — `expected_findings.json` has no phantom entries. `submissions.csv` `asset_files` lists `<base>.png;<base>.html` (PNG first = what the platform ingests); `expected_findings.json` stays keyed by the HTML basename — the PNG↔HTML↔key mapping is by basename convention. The manifest's `disclosures_included` is part of the answer: a clean mock's fine print and its manifest row agree, which is what lets the trigger rules resolve instead of falling back to sub-medium needs-verification chatter.

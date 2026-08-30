@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.db.models import Base, MatrixImport, OfferCellRow
@@ -24,10 +24,25 @@ _engine = None
 _session_factory = None
 
 
+def _apply_sqlite_pragmas(engine) -> None:
+    # Parallel /process requests commit CheckRuns concurrently; WAL + busy_timeout
+    # prevent "database is locked" under the dev server's threaded mode.
+    if engine.dialect.name != "sqlite":
+        return
+
+    @event.listens_for(engine, "connect")
+    def _set_pragmas(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+
+
 def get_engine():
     global _engine, _session_factory
     if _engine is None:
         _engine = create_engine(_db_url())
+        _apply_sqlite_pragmas(_engine)
         _session_factory = sessionmaker(bind=_engine)
     return _engine
 

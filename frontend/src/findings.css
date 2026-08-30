@@ -1,0 +1,117 @@
+/* Styles for FindingsPanel/HistoryList. Unscoped, because the same markup is
+   rendered by the queue's review pane and by the input view's detail section.
+   These rules moved out of queue.css when the component was extracted. */
+
+.panel-note {
+  color: #62676d; /* 5.3:1 on white — muted, still readable */
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+/* --- AI status banner --- */
+
+.banner {
+  padding: 10px 12px;
+  border: 1px solid;
+  font-weight: bold;
+  margin-bottom: 12px;
+}
+
+.banner-count {
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.banner-quick_check {
+  background: #eaf6ec;
+  border-color: #a8ceb1;
+  color: #245c31;
+}
+
+.banner-needs_attention {
+  background: #fdf3e2;
+  border-color: #dfc088;
+  color: #7a5410;
+}
+
+.banner-high_attention {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+/* --- findings --- */
+
+.finding {
+  border-left: 3px solid #ddd;
+  padding: 6px 0 6px 10px;
+  margin-bottom: 12px;
+}
+
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+
+.chip-critical,
+.chip-high {
+  background: #fdecea;
+  border-color: #e5b3ad;
+  color: #8a1c12;
+}
+
+.chip-medium {
+  background: #fdf3e2;
+  border-color: #dfc088;
+  color: #7a5410;
+}
+
+.chip-low,
+.chip-info {
+  background: #f0f0f0;
+  border-color: #ccc;
+  color: #555;
+}
+
+.rule {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #555;
+}
+
+.finding-summary {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.redline {
+  margin: 4px 0;
+  font-size: 13px;
+  background: #f7f7f2;
+  border-left: 2px solid #c9c9b8;
+  padding: 4px 8px;
+}
+
+/* --- history --- */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1a1f24;
+}
+
+.history-when {
+  color: #62676d;
+}

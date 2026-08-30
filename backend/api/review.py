@@ -1,9 +1,16 @@
 """Flask blueprint backing the reviewer input view at /api/review.
 
-Three endpoints, all thin wrappers over the seeded submissions table:
-  GET  /api/review/submissions            list (optional product/partner filters)
+Four endpoints, all thin wrappers over the seeded submissions table:
+  GET  /api/review/submissions            list (optional product/partner/input_type/ai_status)
   POST /api/review/submissions            multipart upload -> new SubmissionRow
   GET  /api/review/evidence/<filename>    serve a screenshot (uploads/, then fixtures/)
+  POST /api/review/reset                  demo only: reseed from fixtures/, wipe uploads
+                                          (404 unless CLEARPATH_DEMO or debug)
+
+Every listed card carries the same AI-status summary the queue items do, plus the
+latest human verdict (see backend/api/common.py), so a reviewer can tell at a
+glance which inputs the engine has already looked at — and which a person has
+already signed off on — without opening them one by one.
 
 Seeding is unchanged (``python -m backend.db.seed``); this module only makes
 sure the tables exist so a fresh checkout answers instead of 500-ing.
@@ -16,12 +23,21 @@ import uuid
 from datetime import date, timedelta
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from sqlalchemy import select
 
+from backend.api.common import (
+    ai_status_filter,
+    ai_summary,
+    days_ago,
+    filter_by_input_type,
+    human_summary,
+    input_type,
+    open_session,
+)
 from backend.contracts import Product, SubmissionMode
 from backend.db.models import SubmissionRow
-from backend.db.session import get_session, init_db
+from backend.db.seed import seed
 
 review_bp = Blueprint("review", __name__, url_prefix="/api/review")
 
@@ -34,53 +50,65 @@ DEFAULT_SURFACE = "manual_upload"
 INPUT_TYPES = {"proposed": SubmissionMode.PRE_PUBLICATION, "production": SubmissionMode.VERIFICATION}
 
 
-def _session():
-    """Session against the app DB, creating tables if this is a fresh file."""
-    init_db()  # create_all is a no-op once the schema is there; never resets data
-    return get_session()
-
-
-def _input_type(mode: str) -> str:
-    return "production" if mode == SubmissionMode.VERIFICATION.value else "proposed"
-
-
 def _image_url(row: SubmissionRow) -> str | None:
     """First image asset of the submission, as an evidence URL."""
     images = [f for f in (row.asset_files or []) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
     return f"/api/review/evidence/{images[0]}" if images else None
 
 
-def _serialize(row: SubmissionRow) -> dict:
-    return {
+def _serialize(session, row: SubmissionRow) -> dict:
+    card = {
         "submission_id": row.submission_id,
         "product": row.product,
         "partner": row.partner,
         "surface": row.surface,
         "mode": row.mode,
         "date_submitted": row.date_submitted.isoformat() if row.date_submitted else None,
+        # The card shows age now; sla_due stays in the payload as data, unused.
+        "days_ago": days_ago(row.date_submitted),
         "sla_due": row.sla_due.isoformat() if row.sla_due else None,
         "image_url": _image_url(row),
-        "input_type": _input_type(row.mode),
+        "input_type": input_type(row.mode),
     }
+    card.update(ai_summary(session, row))
+    card.update(human_summary(session, row))
+    return card
 
 
 @review_bp.get("/submissions")
 def list_submissions():
-    """Query params: product, partner (both optional, exact match)."""
+    """Query params: product, partner, input_type, ai_status (all optional, exact match).
+
+    Oldest first, matching the queue: the grid and the queue walk the backlog in
+    the same order, so "the next thing to look at" means the same in both views.
+
+    Three of the four filters narrow the query; ai_status can't, because a
+    submission's bucket is a property of its latest CheckRun, computed per row by
+    ai_summary(). It is applied to the serialized cards instead, which keeps one
+    definition of "what the AI thinks of this" rather than a second one in SQL.
+    """
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
+    wanted_type = (request.args.get("input_type") or "").strip()
+    wanted_ai = (request.args.get("ai_status") or "").strip()
 
     stmt = select(SubmissionRow)
     if product:
         stmt = stmt.where(SubmissionRow.product == product)
     if partner:
         stmt = stmt.where(SubmissionRow.partner == partner)
-    stmt = stmt.order_by(SubmissionRow.date_submitted.desc(), SubmissionRow.submission_id)
+    try:
+        stmt = filter_by_input_type(stmt, wanted_type)
+        keep = ai_status_filter(wanted_ai)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    stmt = stmt.order_by(SubmissionRow.date_submitted.asc(), SubmissionRow.submission_id)
 
-    session = _session()
+    session = open_session()
     try:
         rows = session.execute(stmt).scalars().all()
-        return jsonify([_serialize(row) for row in rows])
+        cards = (_serialize(session, row) for row in rows)
+        return jsonify([card for card in cards if keep(card)])
     finally:
         session.close()
 
@@ -99,8 +127,8 @@ def create_submission():
     if not partner:
         return jsonify({"error": "partner is required"}), 400
 
-    input_type = (request.form.get("input_type") or "proposed").strip()
-    if input_type not in INPUT_TYPES:
+    wanted_type = (request.form.get("input_type") or "proposed").strip()
+    if wanted_type not in INPUT_TYPES:
         return jsonify({"error": "input_type must be 'proposed' or 'production'"}), 400
 
     surface = (request.form.get("surface") or "").strip() or DEFAULT_SURFACE
@@ -127,16 +155,76 @@ def create_submission():
         change_summary=notes,
         status="pending_review",
         sla_due=today + timedelta(days=SLA_DAYS),
-        mode=INPUT_TYPES[input_type].value,
+        mode=INPUT_TYPES[wanted_type].value,
     )
 
-    session = _session()
+    session = open_session()
     try:
         session.add(row)
         session.commit()
-        return jsonify(_serialize(row)), 201
+        return jsonify(_serialize(session, row)), 201
     finally:
         session.close()
+
+
+# --------------------------------------------------------------------------- #
+# Demo admin
+#
+# Unauthenticated and destructive: the button that puts a live walkthrough back
+# to a known state between runs. Because it takes no credentials, it is gated
+# instead — off unless a process opts in, so a deployment cannot expose it by
+# omission. See _demo_enabled().
+# --------------------------------------------------------------------------- #
+
+# Explicit falsey spellings, so CLEARPATH_DEMO=0 means off rather than "a
+# non-empty string, therefore on".
+DEMO_OFF_VALUES = {"0", "false", "no", "off"}
+
+
+def _demo_enabled() -> bool:
+    """Whether this process offers the demo admin tools.
+
+    CLEARPATH_DEMO is the deliberate switch a deployment sets knowingly (and can
+    set to 0 to be explicit). Unset, it falls back to app.debug, which keeps the
+    reset button working under `python -m backend.app` without anyone editing a
+    .env — while a production gunicorn process, which is neither in debug nor
+    opted in, has it off by default.
+    """
+    flag = (os.environ.get("CLEARPATH_DEMO") or "").strip()
+    if flag:
+        return flag.lower() not in DEMO_OFF_VALUES
+    return bool(current_app.debug)
+
+
+@review_bp.post("/reset")
+def reset():
+    """Drop the schema, reseed from fixtures/, and clear uploaded evidence.
+
+    Reuses the seeder rather than restating it, so a reset lands exactly the
+    state `python -m backend.db.seed` does and inherits any later change to it.
+    Everything a demo accumulates goes with the schema: check runs, findings,
+    review decisions, rule proposals, and submissions uploaded through the UI.
+
+    404s when the demo tools are off, so a server that does not offer this looks
+    to a caller exactly like one that never had the route.
+    """
+    if not _demo_enabled():
+        return jsonify({"error": "demo reset is disabled on this server"}), 404
+
+    summary = seed()
+
+    # The evidence for those uploaded rows is now unreferenced. Best-effort by
+    # design — a file we cannot unlink is not worth failing the reset over, and
+    # the seeded fixtures live in fixtures/, which this never touches.
+    if UPLOADS_DIR.is_dir():
+        for path in UPLOADS_DIR.iterdir():
+            if path.is_file():
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+
+    return jsonify({"status": "reset", "submissions": summary["submissions"]})
 
 
 @review_bp.get("/evidence/<path:filename>")

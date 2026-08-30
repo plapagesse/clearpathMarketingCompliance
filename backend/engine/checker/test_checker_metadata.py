@@ -33,15 +33,16 @@ def test_state_leak_fires_with_zero_claims(rulebook, real_cells):
     matches = findings_for_rule(result, "PL-STATE-EXCL-001")
     assert matches, emitted_rule_ids(result)
     assert any(f.severity == rule.severity == Severity.HIGH for f in matches)
-    # The answer key classes this reconciliation against the offer matrix as
-    # a truthfulness finding (mock_pl_card_il_leak.html entry).
+    # Reconciliation against the offer matrix is a truthfulness finding
+    # (the class the answer key uses for matrix-contradiction rows).
     assert any(f.check_class == CheckClass.TRUTHFULNESS for f in matches)
 
 
 def test_state_leak_uses_all_targeting_syntax(rulebook, real_cells):
-    """Same leak via the manifest's 'ALL except IA;WV' syntax (the
-    mock_pl_card_il_leak fact pattern): IL is inside the expansion and
-    PL-60-A excludes it."""
+    """Same leak via the manifest's 'ALL except IA;WV' syntax: IL is inside
+    the expansion and PL-60-A excludes it. (The fixture set no longer ships a
+    mock with this leak — the 60-month variant's targeting was re-synced to
+    PL-60-A's states_excluded — so the fact pattern lives here, crafted.)"""
     sub = make_submission(offer_ids=["PL-60-A"], states_targeted="ALL except IA;WV")
     result = run(
         rulebook,

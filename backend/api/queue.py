@@ -1,8 +1,12 @@
 """Flask blueprint: the reviewer queue at /api/queue.
 
-One submission at a time, most urgent first. A submission leaves the queue the
-moment a ReviewDecisionRow exists for it, so `remaining` is the honest count of
-what is still on the reviewer's plate.
+One submission at a time, oldest first — the queue is worked in arrival order,
+so the longest-waiting partner is never the last one looked at. A submission
+leaves the queue the moment a ReviewDecisionRow exists for it, so `remaining` is
+the honest count of what is still on the reviewer's plate. GET /api/queue stays
+undecided-only for that reason; the human verdict fields it carries alongside
+(human_status / decided_by / decided_at) are there for the detail payload, which
+is served by the same serializer and is reached for decided submissions too.
 
 Screenshots are served by the input view's /api/review/evidence/<file> route;
 this module only resolves the on-disk path when it needs to feed the engine.
@@ -18,6 +22,16 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
+from backend.api.common import (
+    SEVERITY_RANK,
+    ai_status_filter,
+    ai_summary,
+    days_ago,
+    filter_by_input_type,
+    human_summary,
+    input_type,
+    latest_check_run,
+)
 from backend.db.models import CheckRunRow, FindingRow, ReviewDecisionRow, SubmissionRow
 from backend.db.session import get_session
 
@@ -29,10 +43,15 @@ FIXTURES_DIR = REPO_ROOT / "fixtures"
 RULEBOOK_DIR = REPO_ROOT / "rulebook"
 OFFER_MATRIX_CSV = FIXTURES_DIR / "offer_matrix.csv"
 
-# Rank severities so "the worst finding in the run" is a max(), not a lookup table.
-SEVERITY_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
-
 EXCERPT_CHARS = 200
+
+# The judge reads the creative as an image and rules on gray-area questions the
+# deterministic rules cannot settle — net impression, substantiation, whether a
+# fine-print cure really cures the headline. That is the hardest call in the
+# pipeline, so it runs on a frontier model by default; the cheap tier
+# demonstrably found nothing on the net-impression mock the answer key plants a
+# medium judgment finding on. Override per-environment with CLEARPATH_JUDGE_MODEL.
+DEFAULT_JUDGE_MODEL = "claude-sonnet-5"
 
 
 # --------------------------------------------------------------------------- #
@@ -75,29 +94,6 @@ def _days_left(sla_due: date | None) -> int | None:
     return (sla_due - date.today()).days
 
 
-def _input_type(mode: str) -> str:
-    return "production" if mode == "verification" else "proposed"
-
-
-def _attention(severities: list[str]) -> str:
-    """Three buckets, so the reviewer knows how hard to look before they look."""
-    worst = max((SEVERITY_RANK.get(s, 0) for s in severities), default=-1)
-    if worst >= SEVERITY_RANK["high"]:
-        return "high_attention"
-    if worst >= SEVERITY_RANK["medium"]:
-        return "needs_attention"
-    return "quick_check"
-
-
-def _latest_check_run(session, sub: SubmissionRow) -> CheckRunRow | None:
-    return session.execute(
-        select(CheckRunRow)
-        .where(CheckRunRow.submission_id == sub.id)
-        .order_by(CheckRunRow.created_at.desc(), CheckRunRow.id.desc())
-        .limit(1)
-    ).scalar_one_or_none()
-
-
 def _item(session, sub: SubmissionRow) -> dict:
     filename = _evidence_file(sub)
     item = {
@@ -109,25 +105,19 @@ def _item(session, sub: SubmissionRow) -> dict:
         # Served by the input view's blueprint — same uploads/-then-fixtures/
         # lookup, so there is no reason for a second copy of that route here.
         "image_url": f"/api/review/evidence/{filename}" if filename else None,
+        "date_submitted": sub.date_submitted.isoformat() if sub.date_submitted else None,
+        # What the UI shows now. sla_due/days_left stay in the payload: the SLA
+        # is still real data, it just isn't what the reviewer is steered by.
+        "days_ago": days_ago(sub.date_submitted),
         "sla_due": sub.sla_due.isoformat() if sub.sla_due else None,
         "days_left": _days_left(sub.sla_due),
-        "input_type": _input_type(sub.mode),
-        "ai_status": "unprocessed",
+        "input_type": input_type(sub.mode),
     }
-    run = _latest_check_run(session, sub)
-    if run is not None:
-        severities = [f.severity for f in run.findings]
-        item.update(
-            {
-                "ai_status": "processed",
-                "max_severity": max(severities, key=lambda s: SEVERITY_RANK.get(s, 0))
-                if severities
-                else None,
-                "findings_count": len(severities),
-                "attention": _attention(severities),
-                "latest_check_run_id": run.id,
-            }
-        )
+    item.update(ai_summary(session, sub))
+    # Always "none" for an item served by GET /api/queue, which is undecided-only
+    # by definition — but the detail and decision payloads share this serializer,
+    # and there the human verdict is the whole point.
+    item.update(human_summary(session, sub))
     return item
 
 
@@ -150,9 +140,18 @@ def _decided_ids(session) -> list[str]:
 
 @queue_bp.get("")
 def queue():
-    """Undecided submissions for a product/partner combo, most urgent first."""
+    """Undecided submissions for a product/partner/input-type/ai-status combo, oldest first.
+
+    The four params are the queue's cycle set: exactly the selectors the input
+    grid offers, so "scoped to credit_karma mortgages the AI flagged" means the
+    same thing whichever view the reviewer sets it from. ai_status is applied to
+    the serialized cards for the reason review.py's is — the bucket is a property
+    of the latest CheckRun, which only exists once ai_summary() has run.
+    """
     product = (request.args.get("product") or "").strip()
     partner = (request.args.get("partner") or "").strip()
+    wanted_type = (request.args.get("input_type") or "").strip()
+    wanted_ai = (request.args.get("ai_status") or "").strip()
 
     session = get_session()
     try:
@@ -161,17 +160,24 @@ def queue():
             stmt = stmt.where(SubmissionRow.product == product)
         if partner:
             stmt = stmt.where(SubmissionRow.partner == partner)
+        try:
+            stmt = filter_by_input_type(stmt, wanted_type)
+            keep = ai_status_filter(wanted_ai)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         decided = _decided_ids(session)
         if decided:
             stmt = stmt.where(SubmissionRow.id.notin_(decided))
-        # sla_due ascending; undated submissions sort last, ids break ties.
+        # Oldest first: the reviewer works the backlog in arrival order, so the
+        # submission that has waited longest is the one on screen. Ids break ties.
         stmt = stmt.order_by(
-            SubmissionRow.sla_due.is_(None),
-            SubmissionRow.sla_due.asc(),
+            SubmissionRow.date_submitted.asc(),
             SubmissionRow.submission_id.asc(),
         )
         subs = list(session.execute(stmt).scalars().all())
-        items = [_item(session, s) for s in subs]
+        # remaining counts what came through the filter, so the header and the
+        # cycle the reviewer is actually walking are the same list.
+        items = [item for item in (_item(session, s) for s in subs) if keep(item)]
         return jsonify({"remaining": len(items), "items": items})
     finally:
         session.close()
@@ -201,7 +207,7 @@ def detail(sid: str):
         item = _item(session, sub)
 
         findings = []
-        run = _latest_check_run(session, sub)
+        run = latest_check_run(session, sub)
         if run is not None:
             findings = [
                 {
@@ -261,7 +267,9 @@ def process(sid: str):
     """Run the real pipeline synchronously: extract -> run_checks -> run_judge.
 
     Two live model calls, so this takes 15-40s; the UI holds a processing state
-    rather than us pretending it's fast.
+    rather than us pretending it's fast. The extraction call returns the
+    creative's full text alongside the typed claims and disclosures, so the
+    checker's layout rules run on the real reading order rather than degrading.
     """
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return jsonify({"error": "no API key configured"}), 503
@@ -306,7 +314,10 @@ def process(sid: str):
                 offer_cells=load_offer_matrix(OFFER_MATRIX_CSV),
                 offer_matrix_version="ui",
                 rulebook=rulebook,
-                artifact_text=None,
+                # The creative's own text, transcribed in reading order by the
+                # same extraction call. Without it the layout rules would be
+                # measuring distances inside a concatenation of fragments.
+                artifact_text=extraction.artifact_text or None,
             )
             judged = run_judge(
                 submission=submission,
@@ -314,7 +325,7 @@ def process(sid: str):
                 disclosures=disclosures,
                 evidence_path=str(evidence_path),
                 rulebook=rulebook,
-                model="claude-haiku-4-5",
+                model=os.environ.get("CLEARPATH_JUDGE_MODEL") or DEFAULT_JUDGE_MODEL,
             )
         except Exception as exc:  # noqa: BLE001 — surface any engine/API failure verbatim
             return jsonify({"error": f"{type(exc).__name__}: {exc}"}), 502

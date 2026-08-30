@@ -11,6 +11,17 @@ contract CheckRun stores findings but not the extracted claims/disclosures, so
 the full fidelity diff accepts `baseline_claims` / `baseline_disclosures`
 directly; with only `baseline` the fidelity pass degrades to a findings-delta.
 
+`artifact_text` is the creative's own text in reading order and callers should
+always supply it — the extractor now returns it on the same call that types the
+claims. Without it the token-bound rules fall back to a concatenation of claim
+and disclosure fragments, where distance is an artefact of concatenation order:
+the run carries one info-severity coverage marker and every proximity finding
+is demoted to a sub-medium needs-verification finding, never the rule's full
+severity.
+
+Findings are written for compliance officers — see engine.py's "Finding prose"
+note for the convention and the vocabulary tables that keep it data-driven.
+
 Pass verifier (opt-in, separate from the pure/offline engine):
 `verify_passed_rules(...)` (verifier.py) sends the text-dependent rules that
 produced NO finding to a cheap model ("claude-haiku-4-5" by default —

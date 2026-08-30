@@ -50,7 +50,7 @@ RULEBOOK_DIR = REPO / "rulebook"
 
 # Pinned versions (rulebook/manifest.json; fixtures/expected_findings.json
 # `_offer_matrix_version`).
-RULEBOOK_VERSION = "2026.08.4"  # authorized factual refresh: triage bump postdated the suite
+RULEBOOK_VERSION = "2026.08.5"  # claim_types_any scoping on the TRUTH reconciliations
 OFFER_MATRIX_VERSION = "2026-08"
 
 SEV_AT_LEAST_MEDIUM = {Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL}
@@ -65,6 +65,37 @@ EXPECTED: dict[str, dict] = {k: v for k, v in _KEY.items() if not k.startswith("
 
 COMPLIANT_MOCKS = sorted(k for k, v in EXPECTED.items() if not v["expected_findings"])
 VIOLATION_MOCKS = sorted(k for k, v in EXPECTED.items() if v["expected_findings"])
+
+# The rulebook is loaded once at import so the violation mocks can be split by
+# check_kind at COLLECTION time (parametrize ids), not inside a test; the
+# session `rulebook` fixture below hands out this same object.
+_RULEBOOK = load_rulebook(RULEBOOK_DIR)
+
+
+def expected_rule_ids(mock_name: str) -> set[str]:
+    """Every rule_id the key expects for a mock, excluding fidelity rows (the
+    engine emits those with rule_id=None — see expected_deterministic_ids)."""
+    out: set[str] = set()
+    for entry in EXPECTED[mock_name]["expected_findings"]:
+        if entry.get("check_class") == "fidelity":
+            continue
+        out |= set(entry["expected_rule_ids"])
+    return out
+
+
+_DET_RULE_IDS = {r.rule_id for r in _RULEBOOK.deterministic_rules}
+
+# Violation mocks split by what the DETERMINISTIC engine can be asked to prove.
+# A mock whose planted rule_ids are ALL llm_judged (e.g. the net-impression
+# credit-card mock, whose sole row is CC-JUDGE-001) gives the deterministic
+# conformance test nothing to assert — it is deterministically CLEAN, and that
+# is asserted instead by the judgment-only guard in the conformance suite.
+DETERMINISTIC_VIOLATION_MOCKS = sorted(
+    m for m in VIOLATION_MOCKS if expected_rule_ids(m) & _DET_RULE_IDS
+)
+JUDGMENT_ONLY_MOCKS = sorted(
+    m for m in VIOLATION_MOCKS if not (expected_rule_ids(m) & _DET_RULE_IDS)
+)
 
 
 def normalized_text(raw_html: str) -> str:
@@ -244,7 +275,7 @@ def make_cell(**overrides) -> OfferCell:
 
 @pytest.fixture(scope="session")
 def rulebook():
-    return load_rulebook(RULEBOOK_DIR)
+    return _RULEBOOK
 
 
 @pytest.fixture(scope="session")

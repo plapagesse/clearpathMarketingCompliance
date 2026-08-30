@@ -1,7 +1,7 @@
 # CONSUMED_FIELDS — the deterministic checker's demand ledger
 
 Exact inventory of every input field the engine **reads** while evaluating the
-38 deterministic rules (rulebook v2026.08.3). If a field is not listed for a
+38 deterministic rules (rulebook v2026.08.5). If a field is not listed for a
 rule, the engine never touches it. Composite claim_field names now use the payload vocabulary directly
 (ruling: no internal mapping layer). This ledger is the demand-side input to the
 claim-type payload trim: a `normalized_fields` key read by no rule below (and
@@ -52,11 +52,15 @@ text** via their pattern sets, not on payload fields (`badge_word`, `strength`,
 
 ## Other inputs read (non-payload)
 
-- **Claim**: `claim_types` (routing: rule subscription intersection), `text`
+- **Claim**: `claim_types` (routing: rule subscription intersection, and
+  `claim_types_any` scoping on ground_truth_consistency sub-checks), `text`
   (phrase/pattern matching), `id` (finding anchoring). `location` is NOT read
   (all proximity rules are text_plane today).
 - **Disclosure**: `disclosure_type` (required-disclosure and element presence),
-  `text` (qualifier cures). `prominence`/`location` NOT read (no claim_plane
+  `text` (qualifier cures, AND type derivation — every disclosure's text is
+  matched against `data/disclosure_type_patterns.json` and the derived types
+  are unioned with the declared one before `trigger_requires_disclosures`
+  membership is tested). `prominence`/`location` NOT read (no claim_plane
   proximity rule exists).
 - **Submission**: `product` (scope filter), `surface` (CC-SCHUMER applies_when),
   `offer_ids` (ground-truth cell selection), `states_targeted` (state cap +
@@ -79,7 +83,7 @@ text** via their pattern sets, not on payload fields (`badge_word`, `strength`,
 | PL-TRIG-001 | — | claim.claim_types/text vs trigger patterns; disclosure_type |
 | PL-APR-001 | — | text plane (anchors/companions) |
 | PL-APR-002 | — | claim text vs floor patterns; disclosure_type |
-| PL-TRUTH-001 | value_pct, is_floor_claim, amount_value, term_months | cells apr/amount/term bounds, effective window; date_submitted |
+| PL-TRUTH-001 | value_pct, is_floor_claim, amount_value, term_months (each sub-check scoped by `claim_types_any` — amount_value only on a claim that is also a triggering term) | cells apr/amount/term bounds, effective window; date_submitted |
 | PL-STATE-CAP-001 | value_pct, range_max_pct | states_targeted; caps table; cells.apr_max (fallback) |
 | PL-STATE-EXCL-001 | — | states_targeted vs cells.states_excluded (metadata plane; fires with zero claims) |
 | PL-FEE-001 | — | claim text vs no-fee phrases; cells.fee_deducted_from_proceeds; cure patterns over disclosures/claims/text |
@@ -92,7 +96,7 @@ text** via their pattern sets, not on payload fields (`badge_word`, `strength`,
 | CC-SCHUMER-001 | — | submission.surface; disclosure_type schumer_box_link |
 | CC-PRESCREEN-001 | — | cells.is_firm_offer (applies_when); disclosure_type + detection patterns |
 | CC-BADGE-001 | — | claim text; cells.is_firm_offer |
-| CC-TRUTH-001 | promo_rate_pct, promo_period_months, range_min_pct, range_max_pct, amount_value, fee_type | cells intro/apr/annual_fee fields, effective window; date_submitted |
+| CC-TRUTH-001 | promo_rate_pct, promo_period_months, range_min_pct, range_max_pct, amount_value, fee_type (each sub-check scoped by `claim_types_any`) | cells intro/apr/annual_fee fields, effective window; date_submitted |
 | MTG-REGN-001 | — | claim text vs mortgage-approval lexicon |
 | MTG-FIXED-001 | — | text plane 'fixed'; cells.apr_type |
 | MTG-GOV-001 | — | claim text vs gov terms; government_program_verified UNRESOLVABLE → needs-verification |
@@ -100,12 +104,12 @@ text** via their pattern sets, not on payload fields (`badge_word`, `strength`,
 | MTG-NMLS-001 | — | text plane NMLS detection; disclosure_type assist |
 | MTG-RATE-001 | — | text plane (rate anchors vs APR label) |
 | MTG-DEBT-001 | — | claim text vs debt-elimination lexicon |
-| MTG-TRUTH-001 | value_pct, labeled_as_apr, rate_kind | cells apr bounds, effective window; date_submitted |
+| MTG-TRUTH-001 | value_pct, labeled_as_apr, rate_kind (rate sub-checks scoped by `claim_types_any`) | cells apr bounds, effective window; date_submitted |
 | MTG-COUNSEL-001 | — | text plane 'counselor' |
 | XP-UDAAP-001-(pl/cc/mtg) | — | claim text vs UDAAP lexicon (+text safety net) |
 | XP-PREQ-002-(pl/cc/mtg) | — | claim text vs prequalified terms; disclosure_type not_guaranteed |
 | XP-URG-004-(pl/cc/mtg) | — | claim text vs urgency lexicon; derived effective_end_supports_urgency (cells.effective_end, date_submitted) |
-| XP-SOFT-007-(pl/cc/mtg) | — | claim text vs soft-pull lexicon; soft_pull_verified UNRESOLVABLE → needs-verification |
+| XP-SOFT-007-(pl/cc/mtg) | — | claim text vs soft-pull lexicon; soft_pull_verified from `data/integration_config.json` keyed by submission.partner, UNRESOLVED for an unregistered partner → needs-verification |
 
 Fidelity (engine-level, no rule): reads `value_pct` + `is_floor_claim` on rate
 claims and `disclosure_type` sets when `baseline_claims`/`baseline_disclosures`
