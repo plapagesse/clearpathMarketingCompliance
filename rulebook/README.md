@@ -35,6 +35,7 @@ endorsement_or_testimonial, government_affiliation, general_udaap_representation
 | `mortgage_prequal.json` | Reg N (12 CFR 1014.3) prohibitions, Reg Z mortgage provisions, NMLS display, taxes-&-insurance, staleness |
 | `cross_product.json` | UDAAP lexicon, "prequalified" qualifiers, substantiation, urgency, endorsements, soft-pull claims — expanded per product (see below) |
 | `claim_types_legal_map.json` | ClaimType classification spec: definitions, positive/near-miss examples, structured authorities, and `normalized_fields` — the extractor↔checker payload CONTRACT per type (injected into the Stage-3 extractor prompt) |
+| [`PROVENANCE.md`](PROVENANCE.md) | Generated provenance map: every rule traced to its top-level body of law (regenerate: `python rulebook/generate_provenance.py`; staleness guard: `--check`) |
 | `data/lexicons.json` | Shared phrase lists (referenced via `@lexicons.<key>`) |
 | `data/patterns.json` | Shared regex sets (referenced via `@patterns.<key>`) |
 | `data/state_apr_caps.json` | State APR cap table (referenced via `@state_apr_caps.<key>`) |
