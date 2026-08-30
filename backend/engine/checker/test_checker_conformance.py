@@ -9,6 +9,10 @@ Ground truth: fixtures/expected_findings.json (rulebook v2026.08.3 rule_ids).
   CC-JUDGE-001 are excluded by check_kind lookup in the rulebook; fidelity
   entries are asserted in test_checker_fidelity.py because the engine emits
   those with rule_id=None).
+- Judgment-only violation mocks (every planted rule_id is llm_judged — the
+  net-impression credit-card mock): the deterministic engine has nothing to
+  prove there, so they are parametrized into the inverse guard instead —
+  running them must stay CLEAN at severity medium and above.
 - Compliant mocks: zero deterministic violations — nothing at severity
   medium or above (info/needs-verification chatter is allowed).
 """
@@ -21,21 +25,38 @@ from backend.contracts import CheckClass, SubmissionMode
 
 from conftest import (
     COMPLIANT_MOCKS,
+    DETERMINISTIC_VIOLATION_MOCKS,
     EXPECTED,
+    JUDGMENT_ONLY_MOCKS,
     OFFER_MATRIX_VERSION,
     RULEBOOK_VERSION,
     SEV_AT_LEAST_MEDIUM,
     VIOLATION_MOCKS,
     assert_engine_invariants,
+    deterministic_ids,
     emitted_rule_ids,
     expected_deterministic_ids,
+    expected_rule_ids,
     findings_for_rule,
+    llm_judged_ids,
     rule_by_id,
     run_mock,
 )
 
 
-@pytest.mark.parametrize("mock_name", VIOLATION_MOCKS)
+def test_violation_mocks_split_by_check_kind_covers_the_key():
+    """The two parametrizations below must together cover every violation mock
+    in the answer key, and neither may be empty — a fixture rebalance that
+    drops the judgment-only case would otherwise silently retire the inverse
+    guard, and one that drops every deterministic case would retire the
+    superset check."""
+    assert set(DETERMINISTIC_VIOLATION_MOCKS) | set(JUDGMENT_ONLY_MOCKS) == set(VIOLATION_MOCKS)
+    assert not (set(DETERMINISTIC_VIOLATION_MOCKS) & set(JUDGMENT_ONLY_MOCKS))
+    assert DETERMINISTIC_VIOLATION_MOCKS
+    assert JUDGMENT_ONLY_MOCKS
+
+
+@pytest.mark.parametrize("mock_name", DETERMINISTIC_VIOLATION_MOCKS)
 def test_violation_mock_fires_expected_deterministic_rules(
     mock_name, rulebook, submissions_by_id, real_cells
 ):
@@ -47,6 +68,33 @@ def test_violation_mock_fires_expected_deterministic_rules(
     assert not missing, (
         f"{mock_name}: expected deterministic rules did not fire: {sorted(missing)}; "
         f"emitted={sorted(emitted_rule_ids(run))}"
+    )
+
+
+@pytest.mark.parametrize("mock_name", JUDGMENT_ONLY_MOCKS)
+def test_judgment_only_mock_is_deterministically_clean(
+    mock_name, rulebook, submissions_by_id, real_cells
+):
+    """Inverse guard for mocks whose every planted violation is llm_judged.
+
+    The key plants a gray-area call the judge owns (CC-JUDGE-001 on the
+    net-impression mock) and nothing else, which is a positive claim about the
+    DETERMINISTIC engine too: every deterministic defect of the earlier draft
+    was fixed in the creative, so a run must be as silent as it is on a
+    certified-compliant mock. This is the assertion the superset check cannot
+    make on such a mock (its expected deterministic set is empty)."""
+    assert not (expected_rule_ids(mock_name) & deterministic_ids(rulebook)), (
+        f"{mock_name} is no longer judgment-only — it belongs in the superset test"
+    )
+    assert expected_rule_ids(mock_name) <= llm_judged_ids(rulebook), mock_name
+
+    run = run_mock(mock_name, rulebook, submissions_by_id, real_cells)
+    assert_engine_invariants(run, rulebook)
+    offenders = [f for f in run.findings if f.severity in SEV_AT_LEAST_MEDIUM]
+    assert not offenders, (
+        f"{mock_name} plants only llm_judged violations, so the deterministic "
+        f"engine must stay clean, but it raised: "
+        f"{[(f.rule_id, f.severity, f.summary) for f in offenders]}"
     )
 
 

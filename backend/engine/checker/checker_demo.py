@@ -1,7 +1,7 @@
 """Checker smoke demo (not a test).
 
-Runs the deterministic checker against the trigger-stale fixture using
-key-derived "perfect extraction" claims: the answer key's claim_text /
+Runs the deterministic checker against the pre-approved / guaranteed-approval
+fixture using key-derived "perfect extraction" claims: the answer key's claim_text /
 expected_claim_type / expected_normalized_fields become Claim objects, the
 mock's fine print is scanned for the disclosures a perfect extractor would
 have found, and the artifact text is the tag-stripped mock HTML.
@@ -25,7 +25,7 @@ from backend.engine.checker import load_rulebook, run_checks, verify_passed_rule
 from backend.ingest.parsers import load_offer_matrix, load_submissions
 
 REPO = Path(__file__).resolve().parents[3]
-MOCK = "mock_pl_card_trigger_stale.html"
+MOCK = "mock_pl_card_preapproved_guaranteed.html"
 
 # fine-print scans a perfect extractor would have produced (demo-only)
 _DISCLOSURE_SCANS: list[tuple[DisclosureType, str]] = [

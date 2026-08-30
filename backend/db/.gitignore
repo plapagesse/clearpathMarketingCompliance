@@ -1,1 +1,4 @@
 *.db
+# WAL sidecars, created alongside the db by the journal_mode pragma.
+*.db-shm
+*.db-wal

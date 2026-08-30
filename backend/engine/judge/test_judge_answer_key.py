@@ -2,9 +2,9 @@
 mocks that plant judge-visible violations line up with
 fixtures/expected_findings.json.
 
-- mock_cc_card_intro_violations.html: the fee net-impression row is the one
-  check_class="judgment" row in the whole key; expected_rule_ids include
-  CC-JUDGE-001.
+- mock_cc_card_net_impression.html: the fee net-impression row is that mock's
+  ONLY row and the one check_class="judgment" row in the whole key;
+  expected_rule_ids include CC-JUDGE-001.
 - mock_pl_card_preapproved_guaranteed.html: the missing-qualifier row maps to
   PL-JUDGE-001. NOTE: that row is recorded with check_class "legality" and
   severity "high" while PL-JUDGE-001 is an llm_judged rule of severity
@@ -26,12 +26,16 @@ except ImportError:  # flat fallback: this directory is pytest's rootdir insert
     import conftest as C
 
 
-def test_cc_intro_judgment_finding_matches_answer_key(
-    rulebook, expected_findings, cc_intro_submission, cc_intro_claims, cc_intro_disclosures
+def test_cc_net_impression_judgment_finding_matches_answer_key(
+    rulebook,
+    expected_findings,
+    cc_net_impression_submission,
+    cc_net_impression_claims,
+    cc_net_impression_disclosures,
 ):
     key_rows = [
         f
-        for f in expected_findings["mock_cc_card_intro_violations.html"]["expected_findings"]
+        for f in expected_findings["mock_cc_card_net_impression.html"]["expected_findings"]
         if f["check_class"] == "judgment"
     ]
     assert len(key_rows) == 1
@@ -54,10 +58,10 @@ def test_cc_intro_judgment_finding_matches_answer_key(
     )
     client = C.FakeJudgeClient(verdicts)
     findings = run_judge(
-        submission=cc_intro_submission,
-        claims=cc_intro_claims,
-        disclosures=cc_intro_disclosures,
-        evidence_path=C.EVIDENCE["cc_intro"],
+        submission=cc_net_impression_submission,
+        claims=cc_net_impression_claims,
+        disclosures=cc_net_impression_disclosures,
+        evidence_path=C.EVIDENCE["cc_net_impression"],
         rulebook=rulebook,
         client=client,
     )
@@ -73,7 +77,7 @@ def test_cc_intro_judgment_finding_matches_answer_key(
     assert f.severity == Severity(row["severity"])
     # the verdict quoted the key row's literal claim span -> the finding links
     # the crafted claim carrying exactly that text
-    fee_claim = next(c for c in cc_intro_claims if c.text == row["claim_text"])
+    fee_claim = next(c for c in cc_net_impression_claims if c.text == row["claim_text"])
     assert f.claim_id == fee_claim.id
 
 

@@ -219,6 +219,28 @@ class ReviewDecisionRow(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class RuleProposalRow(Base):
+    """A rule a compliance officer wants added, awaiting human review.
+
+    Additive to the frozen contracts, and deliberately NOT a rule: the rulebook
+    is versioned data on disk (rulebook/*.json) that the engine loads, and a
+    proposal is promoted into it by a person editing that data and cutting a new
+    version. Nothing here is ever executed against a submission.
+    """
+
+    __tablename__ = "rule_proposals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    product: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(Text, default="")
+    severity: Mapped[str] = mapped_column(String)
+    citation_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class FindingRow(Base):
     __tablename__ = "findings"
 

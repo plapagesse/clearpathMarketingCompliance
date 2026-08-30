@@ -1,1 +1,1 @@
-web: gunicorn backend.app:app
+web: gunicorn --threads 8 backend.app:app

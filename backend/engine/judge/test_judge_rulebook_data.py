@@ -90,7 +90,7 @@ def test_severities_the_mapping_tests_depend_on(rulebook):
 def test_answer_key_premises_for_judge_conformance(expected_findings, rulebook):
     """The answer-key conformance tests target two rows; guard their shape.
 
-    Note (spec observation, encoded deliberately loosely): the cc_intro fee
+    Note (spec observation, encoded deliberately loosely): the credit-card fee
     net-impression row is check_class 'judgment', but the preapproved
     missing-qualifier row that maps to llm_judged rule PL-JUDGE-001 is recorded
     as check_class 'legality' with severity 'high', while PL-JUDGE-001 itself
@@ -98,10 +98,13 @@ def test_answer_key_premises_for_judge_conformance(expected_findings, rulebook):
     (rulebook README). The judge tests therefore assert only
     rule_id-membership against that row, per the pinned interface.
     """
-    cc = expected_findings["mock_cc_card_intro_violations.html"]
+    cc = expected_findings["mock_cc_card_net_impression.html"]
     assert cc["product"] == "credit_card"
     judgment_rows = [f for f in cc["expected_findings"] if f["check_class"] == "judgment"]
     assert len(judgment_rows) == 1
+    # ...and it is that mock's ONLY row: the mock is judgment-only, which is
+    # what the checker suite's judgment-only guard asserts from its own side.
+    assert len(cc["expected_findings"]) == 1
     row = judgment_rows[0]
     assert "CC-JUDGE-001" in row["expected_rule_ids"]
     assert row["claim_text"] == "No annual fee. No interest. No brainer."

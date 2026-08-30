@@ -17,11 +17,13 @@ def create_app() -> Flask:
 
     from backend.api.queue import queue_bp
     from backend.api.review import review_bp
+    from backend.api.rulebook_api import rulebook_bp
     from backend.prequal.api import prequal_bp
 
     app.register_blueprint(prequal_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(queue_bp)
+    app.register_blueprint(rulebook_bp)
 
     @app.get("/api/health")
     def health():

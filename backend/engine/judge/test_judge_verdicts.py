@@ -184,12 +184,12 @@ def test_suggested_redline_passthrough(
 
 
 def test_evidence_text_containment_links_claim_id(
-    rulebook, cc_intro_submission, cc_intro_claims, cc_intro_disclosures
+    rulebook, cc_net_impression_submission, cc_net_impression_claims, cc_net_impression_disclosures
 ):
     """Normalized containment: evidence_text is the model's quote of the
     offending span; when it is contained in a claim's text (case/whitespace
     tolerant), the finding links that claim."""
-    fee_claim = next(c for c in cc_intro_claims if c.text == C.CC_FEE_CLAIM_TEXT)
+    fee_claim = next(c for c in cc_net_impression_claims if c.text == C.CC_FEE_CLAIM_TEXT)
 
     # (a) whole claim text, different case
     verdicts = C.full_verdicts(
@@ -204,8 +204,8 @@ def test_evidence_text_containment_links_claim_id(
         },
     )
     findings = _run(
-        cc_intro_submission, cc_intro_claims, cc_intro_disclosures,
-        C.EVIDENCE["cc_intro"], rulebook, C.FakeJudgeClient(verdicts),
+        cc_net_impression_submission, cc_net_impression_claims, cc_net_impression_disclosures,
+        C.EVIDENCE["cc_net_impression"], rulebook, C.FakeJudgeClient(verdicts),
     )
     assert len(findings) == 1
     assert findings[0].claim_id == fee_claim.id
@@ -223,15 +223,15 @@ def test_evidence_text_containment_links_claim_id(
         },
     )
     findings = _run(
-        cc_intro_submission, cc_intro_claims, cc_intro_disclosures,
-        C.EVIDENCE["cc_intro"], rulebook, C.FakeJudgeClient(verdicts),
+        cc_net_impression_submission, cc_net_impression_claims, cc_net_impression_disclosures,
+        C.EVIDENCE["cc_net_impression"], rulebook, C.FakeJudgeClient(verdicts),
     )
     assert len(findings) == 1
     assert findings[0].claim_id == fee_claim.id
 
 
 def test_non_overlapping_evidence_text_leaves_claim_id_unset(
-    rulebook, cc_intro_submission, cc_intro_claims, cc_intro_disclosures
+    rulebook, cc_net_impression_submission, cc_net_impression_claims, cc_net_impression_disclosures
 ):
     verdicts = C.full_verdicts(
         rulebook,
@@ -245,8 +245,8 @@ def test_non_overlapping_evidence_text_leaves_claim_id_unset(
         },
     )
     findings = _run(
-        cc_intro_submission, cc_intro_claims, cc_intro_disclosures,
-        C.EVIDENCE["cc_intro"], rulebook, C.FakeJudgeClient(verdicts),
+        cc_net_impression_submission, cc_net_impression_claims, cc_net_impression_disclosures,
+        C.EVIDENCE["cc_net_impression"], rulebook, C.FakeJudgeClient(verdicts),
     )
     assert len(findings) == 1
     assert findings[0].claim_id is None
