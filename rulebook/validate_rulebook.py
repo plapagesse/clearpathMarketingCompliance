@@ -30,7 +30,18 @@ sys.path.insert(0, str(REPO_ROOT))
 from backend.contracts import CheckKind, ClaimType, DisclosureType, RulebookEntry  # noqa: E402
 
 DISCLOSURE_VALUES = {d.value for d in DisclosureType}
-DATA_FILES = ("lexicons", "patterns", "state_apr_caps")
+CLAIM_TYPE_VALUES = {c.value for c in ClaimType}
+# disclosure_type_patterns and integration_config parameterize the ENGINE
+# rather than any single rule (see backend/engine/checker/rulebook.py), but
+# they live in data/ so the same review covers them and they are @-referenceable
+# like any other shared data.
+DATA_FILES = (
+    "lexicons",
+    "patterns",
+    "state_apr_caps",
+    "disclosure_type_patterns",
+    "integration_config",
+)
 BINDINGS = {"token", "concept"}
 PLANES = {"text_plane", "claim_plane"}
 AUTHORITY_REGIMES = {
@@ -153,7 +164,16 @@ PRIMITIVES: dict[str, dict] = {
         },
         # claim_filter (v2026.08.4): payload-equality narrowing, e.g.
         # {"is_floor_claim": true} selects floor claims for the apr_min check.
-        "optional": {"claim_filter": lambda v: isinstance(v, dict) and v},
+        # claim_types_any (v2026.08.5): restrict the reconciliation to claims
+        # carrying one of these ClaimTypes. Payload keys are shared across the
+        # taxonomy — amount_value is a FEE on a fee_or_cost claim and the sum
+        # advertised on a triggering term — so a sub-check comparing a number
+        # against a matrix column must say which kind of claim legitimately
+        # states it.
+        "optional": {
+            "claim_filter": lambda v: isinstance(v, dict) and v,
+            "claim_types_any": lambda v: _is_str_list(v) and set(v) <= CLAIM_TYPE_VALUES,
+        },
         "pattern_key": None,
     },
     "numeric_cap_by_state": {

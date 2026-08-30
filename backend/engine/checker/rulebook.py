@@ -1,9 +1,17 @@
 """Rulebook loading for the deterministic checker.
 
 Loads manifest + the four rule files, resolves every `@<file>.<key>` data
-reference against data/lexicons.json, data/patterns.json, and
-data/state_apr_caps.json (a dangling reference raises), and exposes the rules
-as validated `RulebookEntry` models with fully-resolved parameters.
+reference against the files in data/ (a dangling reference raises), and
+exposes the rules as validated `RulebookEntry` models with fully-resolved
+parameters.
+
+The loaded data files are also handed to the engine on `Rulebook.data`. Two of
+them are read directly rather than through a rule's `@ref`, because they
+parameterize the engine itself rather than any one rule:
+`disclosure_type_patterns` (deriving a disclosure's legal function from its
+text) and `integration_config` (the partner registry answering verification
+condition_fields). Keeping them in data/ means the same review that changes a
+lexicon covers them.
 """
 
 from __future__ import annotations
@@ -18,6 +26,8 @@ _DATA_FILES = {
     "lexicons": "data/lexicons.json",
     "patterns": "data/patterns.json",
     "state_apr_caps": "data/state_apr_caps.json",
+    "disclosure_type_patterns": "data/disclosure_type_patterns.json",
+    "integration_config": "data/integration_config.json",
 }
 
 
@@ -44,6 +54,10 @@ def _resolve_refs(value, data: dict[str, dict], where: str):
 class Rulebook:
     version: str
     entries: list[RulebookEntry] = field(default_factory=list)
+    # The loaded data/ files, keyed by stem. Rules see them resolved into their
+    # parameters; the engine reads disclosure_type_patterns and
+    # integration_config from here directly.
+    data: dict[str, dict] = field(default_factory=dict)
 
     @property
     def deterministic_rules(self) -> list[RulebookEntry]:
@@ -98,4 +112,4 @@ def load_rulebook(rulebook_dir: str | Path) -> Rulebook:
             raise RulebookLoadError(f"duplicate rule_id {r.rule_id}")
         seen.add(r.rule_id)
 
-    return Rulebook(version=version, entries=entries)
+    return Rulebook(version=version, entries=entries, data=data)

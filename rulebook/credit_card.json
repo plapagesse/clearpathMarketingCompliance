@@ -286,30 +286,45 @@
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "promo_rate_pct",
+            "claim_types_any": [
+              "promotional_or_introductory"
+            ],
             "matrix_field": "intro_apr_pct",
             "comparator": "equals"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "promo_period_months",
+            "claim_types_any": [
+              "promotional_or_introductory"
+            ],
             "matrix_field": "intro_period_months",
             "comparator": "equals"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "range_min_pct",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "range_max_pct",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "amount_value",
+            "claim_types_any": [
+              "fee_or_cost"
+            ],
             "claim_filter": {
               "fee_type": "annual_fee"
             },

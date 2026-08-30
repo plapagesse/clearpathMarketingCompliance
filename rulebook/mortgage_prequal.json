@@ -250,6 +250,9 @@
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "value_pct",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "matrix_field": "apr_min..apr_max",
             "comparator": "within_range"
           },
@@ -262,6 +265,9 @@
           {
             "check_type": "ground_truth_consistency",
             "claim_field": "rate_kind",
+            "claim_types_any": [
+              "rate_or_apr"
+            ],
             "matrix_field": "apr_range",
             "comparator": "not_conflated"
           }

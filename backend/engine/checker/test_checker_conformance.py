@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.contracts import CheckClass, SubmissionMode
+from backend.contracts import CheckClass, ClaimType, DisclosureType, SubmissionMode
 
 from conftest import (
     COMPLIANT_MOCKS,
@@ -109,6 +109,47 @@ def test_compliant_mock_yields_no_finding_at_or_above_medium(
         f"{mock_name} is certified compliant by the answer key, but the engine "
         f"raised: {[(f.rule_id, f.severity, f.summary) for f in offenders]}"
     )
+
+
+# Vocabulary that belongs to the engine, the contracts or the rulebook schema —
+# never to a sentence a compliance officer reads. Enum values are generated from
+# the contracts so a new type cannot slip past this guard.
+_ENGINE_JARGON = (
+    "text_plane", "text-plane", "claim_plane", "claim-plane", "decision_inputs",
+    "check_type", "claim_field", "matrix_field", "condition_field", "claim_types_any",
+    "claim_filter", "normalized_fields", "safety_net", "safety-net detection",
+    "DisclosureType", "ClaimType", "artifact_text", "violates_when", "detection_ref",
+    "anchor_patterns", "companion_patterns", "required_disclosure_types",
+)
+_ENUM_TOKENS = tuple(
+    v for v in
+    [d.value for d in DisclosureType] + [c.value for c in ClaimType]
+    if "_" in v
+)
+
+
+@pytest.mark.parametrize("mock_name", sorted(EXPECTED))
+def test_findings_never_speak_engine_jargon(mock_name, rulebook, submissions_by_id, real_cells):
+    """Every finding is read by a compliance officer, not an engineer.
+
+    The summary and the suggested redline are the two fields the reviewer acts
+    on, so neither may contain an enum value, a rulebook parameter name or an
+    engine-internal term; the explanation may carry a rule id (it is audit
+    trail) but still never a decision-plane term. Rule ids and citations render
+    as chips beside the finding, so repeating them in the prose is noise.
+    """
+    run = run_mock(mock_name, rulebook, submissions_by_id, real_cells)
+    for f in run.findings:
+        for field_name in ("summary", "suggested_redline"):
+            text = getattr(f, field_name) or ""
+            for token in _ENGINE_JARGON + _ENUM_TOKENS:
+                assert token not in text, f"{mock_name} {f.rule_id} {field_name}: {text!r}"
+            assert f.rule_id is None or f.rule_id not in text, (
+                f"{mock_name}: rule id repeated in {field_name} — the UI renders it as a chip"
+            )
+        for token in _ENGINE_JARGON:
+            assert token not in f.explanation, f"{mock_name} {f.rule_id}: {f.explanation!r}"
+        assert f.summary.strip()
 
 
 def test_finding_severity_and_citation_come_from_the_rule(

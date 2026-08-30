@@ -1,6 +1,6 @@
 {
-  "rulebook_version": "2026.08.4",
-  "generated": "2026-08-29",
+  "rulebook_version": "2026.08.5",
+  "generated": "2026-08-30",
   "rule_files": [
     "personal_loan.json",
     "credit_card.json",
@@ -10,7 +10,9 @@
   "data_files": [
     "data/lexicons.json",
     "data/patterns.json",
-    "data/state_apr_caps.json"
+    "data/state_apr_caps.json",
+    "data/disclosure_type_patterns.json",
+    "data/integration_config.json"
   ],
   "counts": {
     "total": 51,

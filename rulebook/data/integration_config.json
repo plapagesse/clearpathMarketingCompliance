@@ -1,0 +1,21 @@
+{
+  "_description": "Partner integration registry — the source for phrase_conditional `condition_field` values that are VERIFICATION INPUTS rather than OfferCell columns (rulebook/README.md, 'Verification-input condition fields'). Keyed by Submission.partner. A partner listed here has had the named property certified by the integrations team; a partner that is ABSENT, or a field that is absent for a listed partner, stays UNRESOLVED and the checker emits a needs-verification finding rather than passing silently — a new partner whose flow nobody has walked is exactly the case the rule exists to catch. This file is demo data standing in for the real integration registry; in production it would be read from the partner-integration service.",
+  "_fields": {
+    "soft_pull_verified": "The partner's prequalification flow was walked end-to-end and triggers no hard credit inquiry before the consumer submits a full application (XP-SOFT-007). False means a hard pull was observed somewhere in the flow."
+  },
+  "credit_karma": {
+    "soft_pull_verified": true,
+    "verified_on": "2026-07-15",
+    "note": "Marketplace prequal flow re-walked at the v7 template rollout; hard inquiry occurs only after the consumer submits the full application."
+  },
+  "nerdwallet": {
+    "soft_pull_verified": true,
+    "verified_on": "2026-08-12",
+    "note": "Review-page and promo-unit rate-check hand off to the same soft-pull prequal endpoint as the marketplace surface."
+  },
+  "lendingtree": {
+    "soft_pull_verified": true,
+    "verified_on": "2026-08-20",
+    "note": "Comparison-module rate check certified at onboarding; lead-form hero submits to the same soft-pull endpoint."
+  }
+}

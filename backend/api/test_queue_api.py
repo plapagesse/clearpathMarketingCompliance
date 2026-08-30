@@ -516,6 +516,77 @@ def test_process_wraps_engine_failure_as_502(client, monkeypatch):
     assert client.get("/api/queue/submission/SUB-BOOM").get_json()["ai_status"] == "unprocessed"
 
 
+def _stub_pipeline(monkeypatch, seen: dict):
+    """Replace the three live calls in process() with recorders.
+
+    process() imports them lazily inside the request, so patching the module
+    attributes is enough — no API key is ever used.
+    """
+    import backend.engine.checker as checker_mod
+    import backend.engine.extractor.extract as extract_mod
+    import backend.engine.judge as judge_mod
+    from backend.contracts import CheckRun, SubmissionMode
+
+    class _Extraction:
+        claims: list = []
+        disclosures: list = []
+        artifact_text = "Prequalified. APR as low as 8.99%. Soft credit check."
+
+    monkeypatch.setattr(extract_mod, "extract", lambda *a, **kw: _Extraction())
+
+    def _checks(**kwargs):
+        seen["artifact_text"] = kwargs.get("artifact_text")
+        return CheckRun(
+            id="chk-stub",
+            submission_id="SUB-WIRE",
+            rulebook_version="stub",
+            offer_matrix_version="stub",
+            mode=SubmissionMode.PRE_PUBLICATION,
+            created_at=datetime.now(timezone.utc),
+            findings=[],
+        )
+
+    monkeypatch.setattr(checker_mod, "run_checks", _checks)
+
+    def _judge(**kwargs):
+        seen["judge_model"] = kwargs.get("model")
+        return []
+
+    monkeypatch.setattr(judge_mod, "run_judge", _judge)
+
+
+def test_process_feeds_the_creatives_text_to_the_checker(client, monkeypatch):
+    """The extraction call transcribes the creative; process() must hand that
+    text to run_checks, or every layout rule runs degraded on a concatenation
+    of claim fragments and Reg Z proximity findings become noise."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-used")
+    _add_submission("SUB-WIRE", date(2026, 9, 1))
+    seen: dict = {}
+    _stub_pipeline(monkeypatch, seen)
+
+    resp = client.post("/api/queue/submission/SUB-WIRE/process")
+
+    assert resp.status_code == 200
+    assert seen["artifact_text"] == "Prequalified. APR as low as 8.99%. Soft credit check."
+
+
+def test_judge_model_defaults_to_the_frontier_tier_and_is_configurable(client, monkeypatch):
+    """Gray-area net-impression calls are the hardest judgment in the pipeline;
+    the cheap tier found nothing on the mock the answer key plants one on."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-used")
+    monkeypatch.delenv("CLEARPATH_JUDGE_MODEL", raising=False)
+    _add_submission("SUB-WIRE", date(2026, 9, 1))
+    seen: dict = {}
+    _stub_pipeline(monkeypatch, seen)
+
+    client.post("/api/queue/submission/SUB-WIRE/process")
+    assert seen["judge_model"] == "claude-sonnet-5"
+
+    monkeypatch.setenv("CLEARPATH_JUDGE_MODEL", "claude-opus-5")
+    client.post("/api/queue/submission/SUB-WIRE/process")
+    assert seen["judge_model"] == "claude-opus-5"
+
+
 def test_filters_lists_present_products_and_partners(client):
     _add_submission("SUB-1", date(2026, 9, 1), product="personal_loan", partner="credit_karma")
     _add_submission("SUB-2", date(2026, 9, 2), product="credit_card", partner="nerdwallet")
