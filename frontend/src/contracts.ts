@@ -5,16 +5,21 @@
 
 export type Product = 'personal_loan' | 'credit_card' | 'mortgage_prequal'
 
+/**
+ * Legal-entity taxonomy: each value names the body of law governing the claim.
+ * A text span embodying two legal categories yields two Claim objects
+ * (extractor convention — no multi-label claims). See CONTRACTS.md.
+ */
 export type ClaimType =
-  | 'rate'
-  | 'payment'
-  | 'amount'
-  | 'approval'
-  | 'fee'
-  | 'urgency'
-  | 'comparison'
-  | 'testimonial'
-  | 'other'
+  | 'triggering_term' // Reg Z 1026.24(d) / 1026.16(b)
+  | 'rate_or_apr' // Reg Z 1026.24(b)-(c)
+  | 'promotional_or_introductory' // Reg Z 1026.16(g)-(h)
+  | 'fixed_rate_representation' // Reg Z 1026.16(f); Reg N 1014.3
+  | 'approval_or_prequalification' // FCRA 603(l); Reg N 1014.3(q)
+  | 'fee_or_cost' // TILA 1026.4; Reg N 1014.3(c)
+  | 'endorsement_or_testimonial' // 16 CFR 255.0
+  | 'government_affiliation' // Reg N 1014.3(n)
+  | 'general_udaap_representation' // FTC Act §5; CFPA §1031 (residual)
 
 export type DisclosureType =
   | 'apr_qualifier'
@@ -52,6 +57,23 @@ export interface Disclosure {
   prominence: string
 }
 
+export type AuthorityRegime =
+  | 'statute'
+  | 'regulation'
+  | 'official_interpretation'
+  | 'agency_guide'
+  | 'enforcement_doctrine'
+  | 'state_statute'
+  | 'state_regulation'
+
+export interface LegalAuthority {
+  body: string // e.g. 'Regulation Z (Truth in Lending Act)'
+  citation: string // pinpoint cite, e.g. '12 CFR § 1026.24(d)(2)'
+  regime: AuthorityRegime
+  regulator: string // CFPB | FTC | state name
+  url: string
+}
+
 export interface RulebookEntry {
   rule_id: string
   product: Product
@@ -59,7 +81,7 @@ export interface RulebookEntry {
   check_kind: CheckKind
   severity: Severity
   parameters: Record<string, unknown>
-  citation_url: string
+  authorities: LegalAuthority[] // min length 1; primary first
   explanation: string
 }
 

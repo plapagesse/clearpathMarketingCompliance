@@ -1,0 +1,378 @@
+{
+  "file": "personal_loan.json",
+  "description": "Closed-end consumer credit advertising rules (Reg Z subpart C) plus personal-loan-specific truthfulness and state-cap rules.",
+  "rules": [
+    {
+      "rule_id": "PL-TRIG-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "triggering_term"
+      ],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "check_type": "trigger_requires_disclosures",
+        "check_description": "When the ad states a payment amount, number of payments, repayment period, downpayment, or finance charge, the full Reg Z companion disclosures must be present.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "trigger_disclosure"
+        ],
+        "safety_net_patterns": "@patterns.triggering_terms_closed_end"
+      },
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.24(d)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
+        }
+      ],
+      "explanation": "Reg Z 12 CFR 1026.24(d): stating a payment amount, number of payments, repayment period, downpayment, or finance-charge amount is a 'triggering term'. Any one present requires the ad to also disclose the downpayment, the full repayment terms, and the APR (labeled as such) plus whether it may increase."
+    },
+    {
+      "rule_id": "PL-APR-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "rate_or_apr"
+      ],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "check_type": "proximity_required",
+        "check_description": "Every advertised rate must be labeled as an APR, and no simple rate may be displayed more prominently than the APR.",
+        "binding": "token",
+        "decision_inputs": "text_plane",
+        "anchor_patterns": "@patterns.rate_percentage",
+        "companion_patterns": "@patterns.apr_label",
+        "requirement": "Every advertised rate must carry the label 'APR' or 'annual percentage rate'; a simple/periodic rate may appear only alongside the APR and not more conspicuously."
+      },
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.24(c)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
+        }
+      ],
+      "explanation": "Reg Z 12 CFR 1026.24(c): an advertised rate must be stated as an annual percentage rate, using that term or 'APR'. A simple/periodic rate may appear only alongside the APR and not more conspicuously."
+    },
+    {
+      "rule_id": "PL-APR-002",
+      "product": "personal_loan",
+      "claim_types": [
+        "rate_or_apr"
+      ],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "check_type": "trigger_requires_disclosures",
+        "check_description": "A 'rates as low as X%' floor claim must have a creditworthiness/conditions qualifier in the same view.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "required_disclosure_types": [
+          "apr_qualifier"
+        ],
+        "note": "Floor availability itself is reconciled by PL-TRUTH-001.",
+        "safety_net_patterns": "@patterns.aslowas_floor"
+      },
+      "authorities": [
+        {
+          "body": "Regulation Z — Official Interpretations",
+          "citation": "12 CFR § 1026.24(a) (Supp. I official interpretations)",
+          "regime": "official_interpretation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/interp-24/"
+        },
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+        }
+      ],
+      "explanation": "'As low as X%' floor advertising requires (a) the floor to be actually available to some meaningful share of applicants and (b) a creditworthiness/conditions qualifier near the number. Missing qualifier is a deterministic fail; floor availability is checked against the offer matrix (see PL-TRUTH-001)."
+    },
+    {
+      "rule_id": "PL-TRUTH-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "rate_or_apr",
+        "triggering_term",
+        "fee_or_cost"
+      ],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "check_type": "composite_all",
+        "check_description": "Every advertised rate, amount, and term must exist in the referenced offer-matrix cells at their current, unexpired version.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "checks": [
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_value",
+            "matrix_field": "apr_min..apr_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "rate_floor",
+            "matrix_field": "apr_min",
+            "comparator": "equals"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "amount_value",
+            "matrix_field": "amount_min..amount_max",
+            "comparator": "within_range"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "term_months",
+            "matrix_field": "term_months",
+            "comparator": "exists_in"
+          },
+          {
+            "check_type": "ground_truth_consistency",
+            "claim_field": "review_date",
+            "matrix_field": "effective_start..effective_end",
+            "comparator": "within_range"
+          }
+        ]
+      },
+      "authorities": [
+        {
+          "body": "Regulation Z (Truth in Lending Act)",
+          "citation": "12 CFR § 1026.24(a)",
+          "regime": "regulation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/"
+        },
+        {
+          "body": "CFPA UDAAP enforcement doctrine (CFPB v. Amerisave, 2014)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "enforcement_doctrine",
+          "regulator": "CFPB",
+          "url": "https://files.consumerfinance.gov/f/201408_cfpb_consent-order_amerisave.pdf"
+        }
+      ],
+      "explanation": "Reg Z 12 CFR 1026.24(a): only actually-available terms may be advertised. Every numeric claim is reconciled against the referenced offer-matrix cells at their current version; stale rates on partner surfaces are the CFPB v. Amerisave ($19.3M, 2014) fact pattern."
+    },
+    {
+      "rule_id": "PL-STATE-CAP-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "rate_or_apr"
+      ],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "check_type": "numeric_cap_by_state",
+        "check_description": "The top of the advertised APR range must not exceed the rate cap of any state the placement targets.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "caps_table": "@state_apr_caps.us_consumer_loan_caps",
+        "compare": "advertised_apr_max_vs_caps_of_states_targeted"
+      },
+      "authorities": [
+        {
+          "body": "State consumer-loan APR caps (incl. Illinois Predatory Loan Prevention Act)",
+          "citation": "815 ILCS 123 (and analogous state statutes; see data/state_apr_caps.json)",
+          "regime": "state_statute",
+          "regulator": "US states (multi-state)",
+          "url": "https://www.mayerbrown.com/en/insights/publications/2021/04/illinois-imposes-strict-36-usury-cap-for-a-range-of-consumer-finance-products-and-providers"
+        }
+      ],
+      "explanation": "Roughly 20 states + DC cap consumer-loan APRs (many at 36%). An ad whose APR range top exceeds a targeted state's cap cannot run there; Illinois's PLPA makes over-cap loans void, so the state-targeting config must be consistent with the advertised range."
+    },
+    {
+      "rule_id": "PL-STATE-EXCL-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "general_udaap_representation"
+      ],
+      "check_kind": "deterministic",
+      "severity": "high",
+      "parameters": {
+        "check_type": "ground_truth_consistency",
+        "check_description": "The placement's targeted states must not include any state the referenced offers exclude.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "claim_field": "states_targeted",
+        "matrix_field": "states_excluded",
+        "comparator": "disjoint_from"
+      },
+      "authorities": [
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+        }
+      ],
+      "explanation": "A placement targeted at states where the referenced offers are unavailable (offer matrix states_excluded) advertises credit the consumer cannot get there — a UDAAP-deceptive geographic leak and a licensing exposure."
+    },
+    {
+      "rule_id": "PL-FEE-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "fee_or_cost"
+      ],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "check_type": "phrase_conditional",
+        "check_description": "A 'no fees' style claim is a violation when the referenced offer deducts an origination fee from loan proceeds, unless the fee is disclosed right next to the claim.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "condition_field": "fee_deducted_from_proceeds",
+        "violates_when": true,
+        "required_qualifier": "origination fee amount/percentage disclosed in immediate proximity",
+        "safety_net_patterns": "@lexicons.no_fee_claims"
+      },
+      "authorities": [
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+        },
+        {
+          "body": "FTC Act Section 5",
+          "citation": "15 U.S.C. § 45(a)",
+          "regime": "statute",
+          "regulator": "FTC",
+          "url": "https://www.law.cornell.edu/uscode/text/15/45"
+        }
+      ],
+      "explanation": "'No (hidden) fees' is deceptive when an origination fee is deducted from loan proceeds (the FTC's LendingClub case theory). Conditional: the phrase is only a violation when the referenced offer cell carries fee_deducted_from_proceeds=true without a proximate fee disclosure."
+    },
+    {
+      "rule_id": "PL-BADGE-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "approval_or_prequalification"
+      ],
+      "check_kind": "deterministic",
+      "severity": "critical",
+      "parameters": {
+        "check_type": "phrase_conditional",
+        "check_description": "'Pre-approved' may appear only when the referenced offer is a true FCRA firm offer of credit.",
+        "binding": "concept",
+        "decision_inputs": "claim_plane",
+        "condition_field": "is_firm_offer",
+        "violates_when": false,
+        "note": "Checker should also reconcile submission.badge_text against offer.badge_designation_allowed.",
+        "safety_net_patterns": "@lexicons.preapproved_terms"
+      },
+      "authorities": [
+        {
+          "body": "Fair Credit Reporting Act",
+          "citation": "15 U.S.C. § 1681a(l)",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.law.cornell.edu/uscode/text/15/1681a"
+        },
+        {
+          "body": "FTC Act § 5 deception doctrine (FTC v. Credit Karma)",
+          "citation": "15 U.S.C. § 45(a)",
+          "regime": "enforcement_doctrine",
+          "regulator": "FTC",
+          "url": "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims"
+        }
+      ],
+      "explanation": "'Pre-approved' may only be used when the offer is a true FCRA firm offer (offer matrix is_firm_offer=true) or completed underwriting stands behind it. FTC v. Credit Karma ($3M): roughly a third of 'pre-approved' consumers were denied. Otherwise the badge must be 'prequalified' with qualifiers."
+    },
+    {
+      "rule_id": "PL-JUDGE-001",
+      "product": "personal_loan",
+      "claim_types": [
+        "rate_or_apr",
+        "fee_or_cost",
+        "approval_or_prequalification",
+        "general_udaap_representation"
+      ],
+      "check_kind": "llm_judged",
+      "severity": "medium",
+      "parameters": {
+        "judge_focus": "Net impression: does the headline promise contradict or bury material limits that only appear in fine print (rate floor availability, fee deduction, approval uncertainty)? Fine print cannot cure a contradictory headline.",
+        "violation_examples": [
+          "Get $25,000 at 8.99% APR — money in your account tomorrow! (fine print: 8.99% available to top 5% of applicants with autopay; most rates 18-36%)",
+          "Borrow with NO upfront costs (fine print: 5% origination fee deducted from your loan proceeds)",
+          "You're basically approved — just click to claim your loan (fine print: subject to full underwriting)"
+        ],
+        "compliant_contrast": "Loans from $2,000-$50,000. APR from 8.99% (with autopay, excellent credit) to 35.99%; an origination fee of 1-8% is deducted from proceeds. Checking your rate won't affect your credit score.",
+        "citation_quote": "It is necessary to evaluate an individual statement, representation, or omission not in isolation, but rather in the context of the entire advertisement, transaction, or course of dealing, to determine whether the overall net impression is misleading or deceptive."
+      },
+      "authorities": [
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf"
+        },
+        {
+          "body": "FTC Act Section 5",
+          "citation": "15 U.S.C. § 45(a)",
+          "regime": "statute",
+          "regulator": "FTC",
+          "url": "https://www.law.cornell.edu/uscode/text/15/45"
+        }
+      ],
+      "explanation": "CFPB UDAAP examination standard (mirroring the FTC Deception Policy Statement): deception is judged on the overall net impression of the ad on a reasonable consumer. A technically-present disclosure does not cure a misleading headline."
+    },
+    {
+      "rule_id": "PL-JUDGE-002",
+      "product": "personal_loan",
+      "claim_types": [
+        "triggering_term"
+      ],
+      "check_kind": "llm_judged",
+      "severity": "medium",
+      "parameters": {
+        "judge_focus": "Is the payment example representative (mid-range rate, typical amount, fees included) or cherry-picked at the unattainable floor? Does the example disclose the assumed rate, term, and any fee baked into it?",
+        "violation_examples": [
+          "Borrow $15,000 for just $304/mo! (computed at the 8.99% floor almost no applicant receives, term undisclosed)",
+          "Payments as low as $89/mo (no amount, rate, or term stated anywhere in the creative)"
+        ],
+        "compliant_contrast": "e.g., $15,000 for 36 months at 13.49% APR = $509/mo; example includes a 4% origination fee.",
+        "citation_quote": "To the extent that an advertisement mentions specific credit terms, it may state only those terms that the creditor is actually prepared to offer."
+      },
+      "authorities": [
+        {
+          "body": "Regulation Z — Official Interpretations",
+          "citation": "12 CFR § 1026.24(a) (Supp. I official interpretations)",
+          "regime": "official_interpretation",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/rules-policy/regulations/1026/interp-24/"
+        },
+        {
+          "body": "Consumer Financial Protection Act (UDAAP)",
+          "citation": "12 U.S.C. § 5531",
+          "regime": "statute",
+          "regulator": "CFPB",
+          "url": "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/"
+        }
+      ],
+      "explanation": "Payment examples must reflect terms actually available and disclose their assumptions; a best-case example presented as typical creates a deceptive net impression even when each number is individually accurate."
+    }
+  ],
+  "citation_index": [
+    "https://www.consumerfinance.gov/rules-policy/regulations/1026/24/",
+    "https://www.consumerfinance.gov/rules-policy/regulations/1026/interp-24/",
+    "https://www.consumerfinance.gov/compliance/supervision-examinations/unfair-deceptive-or-abusive-acts-or-practices-udaaps-examination-procedures/",
+    "https://files.consumerfinance.gov/f/201408_cfpb_consent-order_amerisave.pdf",
+    "https://www.mayerbrown.com/en/insights/publications/2021/04/illinois-imposes-strict-36-usury-cap-for-a-range-of-consumer-finance-products-and-providers",
+    "https://www.law.cornell.edu/uscode/text/15/45",
+    "https://www.law.cornell.edu/uscode/text/15/1681a",
+    "https://www.ftc.gov/news-events/news/press-releases/2023/01/ftc-finalizes-order-requiring-credit-karma-pay-3-million-halt-deceptive-pre-approved-claims",
+    "https://files.consumerfinance.gov/f/documents/cfpb_unfair-deceptive-abusive-acts-practices-udaaps_procedures.pdf"
+  ]
+}

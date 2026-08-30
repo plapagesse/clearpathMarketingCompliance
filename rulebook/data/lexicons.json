@@ -1,0 +1,57 @@
+{
+  "_description": "Shared phrase lexicons. Rules reference these via '@lexicons.<key>'. All phrases match case-insensitively as substrings unless the rule's primitive says otherwise.",
+  "udaap_prohibited": [
+    "guaranteed approval",
+    "regardless of credit",
+    "no credit check",
+    "everyone qualifies",
+    "everyone is approved",
+    "cannot be denied",
+    "can't be denied",
+    "risk-free"
+  ],
+  "mortgage_approval_prohibited": [
+    "pre-approved",
+    "preapproved",
+    "guaranteed approval",
+    "guaranteed rate",
+    "you are approved",
+    "everyone qualifies"
+  ],
+  "no_fee_claims": ["no hidden fees", "no fees", "zero fees"],
+  "preapproved_terms": ["pre-approved", "preapproved"],
+  "fixed_terms": ["fixed"],
+  "government_affiliation_terms": [
+    "FHA",
+    "HUD",
+    "VA loan",
+    "government-backed",
+    "government program",
+    "federally endorsed",
+    "official notice"
+  ],
+  "debt_elimination": [
+    "eliminate your debt",
+    "debt-free",
+    "erase your debt",
+    "wipe out your debt",
+    "eliminate debt"
+  ],
+  "counselor_terms": ["counselor", "counseling service", "housing counselor"],
+  "urgency_devices": [
+    "act now",
+    "expires today",
+    "limited time",
+    "only today",
+    "final notice",
+    "last chance",
+    "offer ends",
+    "rates won't last"
+  ],
+  "soft_pull_claims": [
+    "won't affect your credit score",
+    "no impact to your credit",
+    "doesn't hurt your score",
+    "won't hurt your credit"
+  ]
+}
