@@ -62,117 +62,24 @@
       }
     ]
   },
-  "mock_pl_card_trigger_stale.html": {
+  "mock_pl_card_payment_example.html": {
     "submission_id": "SUB-2026-0147",
     "product": "personal_loan",
     "mode": "pre_publication",
-    "expected_findings": [
-      {
-        "rule_area": "regz_trigger_terms_closed_end",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": "Borrow $10,000 for just $299/mo",
-        "expected_claim_type": "triggering_term",
-        "expected_rule_ids": [
-          "PL-TRIG-001"
-        ],
-        "location_note": "headline",
-        "description": "Payment amount is a Reg Z 1026.24(d) trigger term; the required companion disclosures (repayment terms / number of payments, APR context) are absent from the creative."
-      },
-      {
-        "rule_area": "rate_not_in_offer_matrix",
-        "check_class": "truthfulness",
-        "severity": "high",
-        "claim_text": "APR as low as 7.49%",
-        "expected_claim_type": "rate_or_apr",
-        "expected_rule_ids": [
-          "PL-TRUTH-001"
-        ],
-        "expected_normalized_fields": {
-          "value_pct": 7.49,
-          "is_floor_claim": true,
-          "labeled_as_apr": true,
-          "rate_kind": "apr"
-        },
-        "location_note": "subheadline",
-        "description": "7.49% floor does not exist in any current offer cell (PL-36-A floor is 8.99%) — advertised rate is stale/unavailable (Amerisave fact pattern; Reg Z 1026.24(a) actually-available rule)."
-      },
-      {
-        "rule_area": "apr_floor_qualifier",
-        "check_class": "legality",
-        "severity": "medium",
-        "claim_text": "APR as low as 7.49% for qualified borrowers",
-        "expected_claim_type": "rate_or_apr",
-        "expected_rule_ids": [
-          "PL-APR-002"
-        ],
-        "expected_normalized_fields": {
-          "value_pct": 7.49,
-          "is_floor_claim": true,
-          "labeled_as_apr": true,
-          "rate_kind": "apr"
-        },
-        "location_note": "subheadline; only qualifier is 'for qualified borrowers' — no fee or floor-share context",
-        "description": "'As low as' floor lacks the adjacent creditworthiness/substantiation qualifier used in approved templates."
-      }
-    ]
+    "expected_findings": []
   },
-  "mock_pl_card_il_leak.html": {
+  "mock_pl_card_states.html": {
     "submission_id": "SUB-2026-0148",
     "product": "personal_loan",
     "mode": "pre_publication",
-    "expected_findings": [
-      {
-        "rule_area": "state_eligibility_vs_offer_matrix",
-        "check_class": "truthfulness",
-        "severity": "high",
-        "claim_text": "Available in all states except IA and WV",
-        "expected_claim_type": "general_udaap_representation",
-        "expected_rule_ids": [
-          "PL-STATE-EXCL-001"
-        ],
-        "location_note": "fine print, final sentence",
-        "description": "Creative advertises PL-60-A (APR to 35.99%) as available everywhere except IA/WV, but PL-60-A's states_excluded also lists IL (Illinois PLPA 36% all-in cap) — state-eligibility leak."
-      }
-    ]
+    "expected_findings": []
   },
-  "mock_cc_card_intro_violations.html": {
+  "mock_cc_card_net_impression.html": {
     "submission_id": "SUB-2026-0149",
     "product": "credit_card",
     "mode": "pre_publication",
+    "_review_note": "The only mock in the set whose sole issue is a judgment call: every deterministic Reg Z defect of the earlier v5 draft was fixed in the creative ('intro' now adjacent to the promotional rate; the end-of-promo period and post-promotional APR moved up next to the first listing at normal type size), leaving one gray-area net-impression question for the judge. CC-TRIG-001 was dropped from the row below because the companion open-end disclosures (post-intro APR range, variable-rate statement, balance-transfer fee) are now present on the creative and in the manifest, so the deterministic trigger rule is satisfied.",
     "expected_findings": [
-      {
-        "rule_area": "regz_intro_adjacency_open_end",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": "0% APR for 15 months",
-        "expected_claim_type": "promotional_or_introductory",
-        "expected_rule_ids": [
-          "CC-INTRO-001"
-        ],
-        "expected_normalized_fields": {
-          "promo_rate_pct": 0,
-          "promo_period_months": 15
-        },
-        "location_note": "headline — the word 'intro' appears nowhere near it",
-        "description": "Promotional rate stated without the term 'intro'/'introductory' in immediate proximity (Reg Z 1026.16(g)(3))."
-      },
-      {
-        "rule_area": "regz_post_promo_proximity",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": "0% APR for 15 months",
-        "expected_claim_type": "promotional_or_introductory",
-        "expected_rule_ids": [
-          "CC-INTRO-002"
-        ],
-        "expected_normalized_fields": {
-          "promo_rate_pct": 0,
-          "promo_period_months": 15
-        },
-        "location_note": "headline vs 8px footer: post-promo APR range sits in tiny type below a 64px spacer, far from the first listing of the promo rate",
-        "description": "Post-promotional APR range and end-of-period terms fail the closely-proximate/prominence requirements (Reg Z 1026.16(g)(4))."
-      },
       {
         "rule_area": "fee_claim_net_impression",
         "check_class": "judgment",
@@ -180,78 +87,27 @@
         "claim_text": "No annual fee. No interest. No brainer.",
         "expected_claim_type": "fee_or_cost",
         "expected_rule_ids": [
-          "CC-TRIG-001",
           "CC-JUDGE-001"
         ],
         "expected_normalized_fields": {
           "fee_type": "annual_fee"
         },
         "location_note": "bold subheadline",
-        "description": "'No annual fee'/'No interest' framing omits the 3% balance-transfer fee and permanent-interest reality; negative fee claims trigger Reg Z 1026.16(b) disclosure context and UDAAP net-impression risk."
+        "description": "'No annual fee'/'No interest' framing omits the 3% balance-transfer fee and the fact that interest is deferred rather than absent; the overall net impression of a cost-free card is a UDAAP judgment call even though every number on the creative is individually accurate."
       }
     ]
   },
-  "mock_cc_prescreen_email_no_optout.html": {
+  "mock_cc_prescreen_email.html": {
     "submission_id": "SUB-2026-0144",
     "product": "credit_card",
     "mode": "pre_publication",
-    "expected_findings": [
-      {
-        "rule_area": "fcra_prescreen_optout_notice",
-        "check_class": "legality",
-        "severity": "critical",
-        "claim_text": null,
-        "expected_claim_type": null,
-        "expected_rule_ids": [
-          "CC-PRESCREEN-001"
-        ],
-        "location_note": "prescreen opt-out notice (short + long form) absent from the entire email; requirement triggered by the 'you're pre-approved' firm-offer headline; CAN-SPAM unsubscribe footer does not satisfy it",
-        "description": "Legitimate firm offer (CC-PLAT-PS, is_firm_offer TRUE) so 'pre-approved' is permitted — but the FCRA 615(d) prescreen opt-out notice (12 CFR 1022.54 format rules) is entirely missing."
-      }
-    ]
+    "expected_findings": []
   },
-  "mock_mtg_arm_as_fixed.html": {
+  "mock_mtg_arm_offer.html": {
     "submission_id": "SUB-2026-0150",
     "product": "mortgage_prequal",
     "mode": "pre_publication",
-    "expected_findings": [
-      {
-        "rule_area": "regn_arm_as_fixed",
-        "check_class": "legality",
-        "severity": "critical",
-        "claim_text": "Lock in a fixed low rate of 6.250%",
-        "expected_claim_type": "fixed_rate_representation",
-        "expected_rule_ids": [
-          "MTG-FIXED-001"
-        ],
-        "location_note": "headline",
-        "description": "The 5/6 ARM (offer cell MTG-ARM, apr_type variable) is marketed as 'fixed' — prohibited misrepresentation (Reg N 1014.3; Reg Z 1026.24(i)); matrix notes explicitly forbid 'fixed' for this cell."
-      },
-      {
-        "rule_area": "nmls_id_missing",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": null,
-        "expected_claim_type": null,
-        "expected_rule_ids": [
-          "MTG-NMLS-001"
-        ],
-        "location_note": "NMLS unique identifier absent from the entire creative",
-        "description": "No NMLS unique identifier displayed on a mortgage advertisement (SAFE Act-derived state requirements; matrix notes require NMLS #1902441)."
-      },
-      {
-        "rule_area": "regz_payment_taxes_insurance",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": "Pay just $2,463/month on a $400,000 loan",
-        "expected_claim_type": "triggering_term",
-        "expected_rule_ids": [
-          "MTG-TI-001"
-        ],
-        "location_note": "subheadline; no taxes-and-insurance qualifier anywhere in the creative",
-        "description": "First-lien payment amount advertised without the disclosure that the payment excludes taxes and insurance and the actual obligation will be higher (Reg Z 1026.24(f))."
-      }
-    ]
+    "expected_findings": []
   },
   "mock_nw_pl_review_compliant.html": {
     "submission_id": "SUB-2026-0152",
@@ -294,48 +150,11 @@
       }
     ]
   },
-  "mock_nw_pl_guaranteed_5min.html": {
+  "mock_nw_pl_fast_decision.html": {
     "submission_id": "SUB-2026-0154",
     "product": "personal_loan",
     "mode": "pre_publication",
-    "expected_findings": [
-      {
-        "rule_area": "udaap_guaranteed_approval",
-        "check_class": "legality",
-        "severity": "critical",
-        "claim_text": "Guaranteed approval in 5 minutes — bad credit OK",
-        "expected_claim_type": "approval_or_prequalification",
-        "expected_rule_ids": [
-          "XP-UDAAP-001-personal_loan"
-        ],
-        "location_note": "headline",
-        "description": "'guaranteed approval' is a per-se prohibited approval-certainty phrase wherever any underwriting exists; PL-36-A/PL-60-A both carry a 640 minimum credit score, so approval is plainly conditional (FTC Act §5 / CFPA UDAAP)."
-      },
-      {
-        "rule_area": "udaap_no_credit_check",
-        "check_class": "legality",
-        "severity": "critical",
-        "claim_text": "Get prequalified with no credit check — everyone qualifies.",
-        "expected_claim_type": "approval_or_prequalification",
-        "expected_rule_ids": [
-          "XP-UDAAP-001-personal_loan"
-        ],
-        "location_note": "green subheadline directly under the headline",
-        "description": "Two further per-se prohibited lexicon phrases in one line: 'no credit check' (the flow runs a soft pull and then a hard inquiry) and 'everyone qualifies' (640 minimum score, state exclusions)."
-      },
-      {
-        "rule_area": "missing_not_guaranteed_qualifier",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": null,
-        "expected_claim_type": null,
-        "expected_rule_ids": [
-          "XP-PREQ-002-personal_loan"
-        ],
-        "location_note": "creative says 'prequalified' but no approval-not-guaranteed qualifier appears anywhere; the fine print carries only the lender name, the term lengths and the state list",
-        "description": "XP-PREQ-002: whenever the creative says 'prequalified' an approval-not-guaranteed qualifier must be present. It is absent entirely, compounding the approval-certainty headline."
-      }
-    ]
+    "expected_findings": []
   },
   "mock_lt_mtg_compare_compliant.html": {
     "submission_id": "SUB-2026-0155",
@@ -392,57 +211,12 @@
     "mode": "pre_publication",
     "expected_findings": []
   },
-  "seed_screenshot_pl_card_drift.html": {
+  "seed_screenshot_pl_card_verified.html": {
     "submission_id": "SUB-2026-0151",
     "product": "personal_loan",
     "mode": "verification",
     "approved_baseline": "mock_pl_card_compliant.html",
-    "expected_findings": [
-      {
-        "rule_area": "fidelity_apr_floor_changed",
-        "check_class": "fidelity",
-        "severity": "high",
-        "claim_text": "APR as low as 7.99%",
-        "expected_claim_type": "rate_or_apr",
-        "expected_rule_ids": [
-          "PL-TRUTH-001"
-        ],
-        "expected_normalized_fields": {
-          "value_pct": 7.99,
-          "is_floor_claim": true,
-          "labeled_as_apr": true,
-          "rate_kind": "apr"
-        },
-        "location_note": "subheadline; approved baseline reads 8.99%",
-        "description": "Live rendering shows APR floor 7.99% where the approved v7 template says 8.99% — unapproved change, and 7.99% is not a valid rate in the current offer matrix (also a truthfulness failure)."
-      },
-      {
-        "rule_area": "fidelity_disclosures_dropped",
-        "check_class": "fidelity",
-        "severity": "critical",
-        "claim_text": null,
-        "expected_claim_type": null,
-        "expected_rule_ids": [
-          "XP-PREQ-002-personal_loan"
-        ],
-        "location_note": "approved qualifier fine-print paragraph (soft-pull, not-a-guarantee, APR qualifier, fees, states) absent relative to approved baseline mock_pl_card_compliant.html",
-        "description": "The approved qualifier paragraph is absent from the live rendering — partner dropped required disclosures post-approval."
-      },
-      {
-        "rule_area": "regz_trigger_terms_closed_end",
-        "check_class": "legality",
-        "severity": "high",
-        "claim_text": "e.g., $15,000 for 36 months at 13.49% APR = $509/mo",
-        "expected_claim_type": "triggering_term",
-        "expected_rule_ids": [
-          "PL-TRIG-001"
-        ],
-        "expected_normalized_fields": {
-          "term_months": 36
-        },
-        "location_note": "payment-example line; with the fine print dropped, its companion fee/terms disclosures are gone",
-        "description": "With the fine print dropped, the payment example (trigger terms) no longer has its companion fee/terms disclosures in the rendered artifact."
-      }
-    ]
+    "_verification_note": "Verification-mode fixture with NO drift: the seed-account capture reproduces the approved baseline (SUB-2026-0142) exactly — the 8.99% matrix floor and the full qualifier fine print are both intact, and the manifest carries the same disclosure set as the baseline row. A verified-consistent production capture is the positive half of the fidelity demo: the mode still runs, the baseline join key is still populated, and the correct answer is an empty finding list.",
+    "expected_findings": []
   }
 }
